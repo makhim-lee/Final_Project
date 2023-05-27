@@ -1,7 +1,7 @@
-#include <stdio>
+#include <stdio.h>
 
 int main(void){
-	printf("hello");
+	printf("branch test");
 	int a = 10;
 	printf(a);
 	return 0;
