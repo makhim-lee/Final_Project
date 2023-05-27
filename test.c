@@ -3,6 +3,6 @@
 int main(void){
 	printf("hello");
 	int a = 10;
-	printf(a);
+	printf("test merge");
 	return 0;
 }
