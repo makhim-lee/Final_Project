@@ -21,7 +21,7 @@ while True:
 	# MediaPipe의 hands 모듈을 이용해서 손동작을 인식한다. 손동작 인식 AI모델이 작동되고 결과 값이 result로 저장된다. 
 	results = hands.process(imgRGB)
 	# MediaPipe용 RGB 형식으로 변환했던 것을 OpenCV 영상처리를 위해 다시 BGR형식으로 되돌린다. 
-	imgRGB = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+	#imgRGB = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
 	# result값이 정상인 경우에만 후속 작업 처리한다. 
 	if results.multi_hand_landmarks:
