@@ -16,7 +16,7 @@ class HandDetector():
          
         self.finger_id = [4, 8, 12, 16, 20]
  
-        #self.lm_list = []
+        self.lm_list = []
         self.results = None
     
     def findHands(self, img):
@@ -30,6 +30,7 @@ class HandDetector():
     
     def findLandmarks(self, img, hand_index=0):
         self.lm_list = []
+        save_list = []
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[hand_index]
  
@@ -37,9 +38,11 @@ class HandDetector():
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
+                
+                save_list.append([id,format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
-        return self.lm_list
+        return self.lm_list, save_list
     
     def fingersCheck(self):
         fingers = []
