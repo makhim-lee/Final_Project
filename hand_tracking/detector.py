@@ -39,7 +39,7 @@ class HandDetector():
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
                 
-                save_list.append([id,format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
+                save_list.append([format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
         return self.lm_list, save_list
