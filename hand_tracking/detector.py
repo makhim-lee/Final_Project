@@ -5,6 +5,9 @@ import cv2
 from mediapipe.python.solutions import hands as mp_hands
 from mediapipe.python.solutions.drawing_utils import draw_landmarks
 
+import tensorflow as tf
+import numpy as np
+
 import time
 class HandDetector():
     def __init__(self, mode=False, max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence=0.5): 
@@ -15,10 +18,11 @@ class HandDetector():
             min_tracking_confidence)
          
         self.finger_id = [4, 8, 12, 16, 20]
- 
+
         self.lm_list = []
         self.results = None
-    
+
+        self.model = tf.keras.models.load_model('my_model.h5')
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(rgb_img)
@@ -30,7 +34,8 @@ class HandDetector():
     
     def findLandmarks(self, img, hand_index=0):
         self.lm_list = []
-        save_list = []
+        #save_list = []
+        np_array = np.array()
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[hand_index]
  
@@ -38,11 +43,14 @@ class HandDetector():
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
-                
-                save_list.append([format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
+                #save_list.append([format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
+                np_array = np.append(np_array, np.array([[format(lm.x, '.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')]]))
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
-        return self.lm_list, save_list
+            input_data = np_array.reshape(1, -1)
+            prediction = self.model.predict(input_data)
+            print(prediction)
+        return self.lm_list#, save_list
     
     def fingersCheck(self):
         fingers = []
