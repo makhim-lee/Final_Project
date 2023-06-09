@@ -1,0 +1,2 @@
+model_checkpoint_path: "hand_model_weight"
+all_model_checkpoint_paths: "hand_model_weight"
