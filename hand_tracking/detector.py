@@ -4,7 +4,8 @@ import cv2
 
 from mediapipe.python.solutions import hands as mp_hands
 from mediapipe.python.solutions.drawing_utils import draw_landmarks
-
+#import os
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import numpy as np
 
@@ -22,7 +23,8 @@ class HandDetector():
         self.lm_list = []
         self.results = None
 
-        self.model = tf.keras.models.load_model('my_model.h5')
+        self.model = tf.keras.models.load_model('hand_model.h5')
+        self.input_model_data = []
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(rgb_img)
@@ -34,8 +36,8 @@ class HandDetector():
     
     def findLandmarks(self, img, hand_index=0):
         self.lm_list = []
-        #save_list = []
-        np_array = np.array()
+        self.input_model_data = []
+        prediction = None
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[hand_index]
  
@@ -43,15 +45,27 @@ class HandDetector():
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
-                #save_list.append([format(lm.x,'.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')])
-                np_array = np.append(np_array, np.array([[format(lm.x, '.3f'), format(lm.y,'.3f'), format(lm.z,'.3f')]]))
+                self.input_model_data.append([round(lm.x, 3), round(lm.y, 3), round(lm.z, 3)])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
-            input_data = np_array.reshape(1, -1)
-            prediction = self.model.predict(input_data)
-            print(prediction)
-        return self.lm_list#, save_list
+            #input_data = np.array(self.input_model_data).reshape(1,-1)
+            #prediction = self.model.predict(input_data)
+        return self.lm_list#, prediction
     
+    def detectorMotion(self):
+        if self.input_model_data :
+            input_data = np.array(self.input_model_data).reshape(1,-1)
+            prediction = self.model.predict(input_data)
+            if prediction[0][0] > 0.9 :
+                return "Vectory"
+                #print(self.motion)
+            elif prediction[0][1] > 0.9 :
+                return "OK"
+                #print(self.motion)
+            elif prediction[0][2] > 0.9 :
+                return "Pointer"
+                #print(self.motion)
+            
     def fingersCheck(self):
         fingers = []
         fingers.append(1 if self.lm_list[self.finger_id[0]][1] < self.lm_list[self.finger_id[0] - 2][1] \
