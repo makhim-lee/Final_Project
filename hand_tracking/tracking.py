@@ -2,24 +2,24 @@ import cv2
 import time
 import numpy as np
 import detector
+import threading
 from pprint import pprint
 cap = cv2.VideoCapture(-1)
 detector = detector.HandDetector()
-prev_fingers= None
 
-
+#thread = threading.Thread(target=detector.detectorMotion())
+#thread.start()
 while True:
     success, img = cap.read()
     img = detector.findHands(img)
     
     lm_list = detector.findLandmarks(img) 
-    if len(lm_list) != 0 :
-        fingers = detector.fingersCheck()
-        pprint(fingers)
-        if fingers[1] == 1 and fingers[2] == 1 :
-            length, img, linInfo = detector.calculateDistance(8, 12, img) 
-
+    motion = detector.detectorMotion()
+    print(motion)
     cv2.imshow("Gotcha", cv2.flip(img, 1))
-    cv2.waitKey(1)
     
+    if cv2.waitKey(1) :
+        break
+
+#thread.join()
     
