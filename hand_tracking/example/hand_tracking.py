@@ -1,7 +1,7 @@
 import cv2
 import time
 import numpy as np
-import hand_detector as hd
+import hand_tracking.example.hand_detector as hd
 import pyautogui
  
  
