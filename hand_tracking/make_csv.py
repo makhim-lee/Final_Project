@@ -1,12 +1,12 @@
 import pandas as pd
 import cv2
 import numpy as np
-import detector
+from detector import HandDetector
 from pprint import pprint
 import time
 
 cap = cv2.VideoCapture(-1)
-detector = detector.HandDetector()
+detector = HandDetector()
 filename = "landmarks.csv"
 save_data=[]
 count = 0

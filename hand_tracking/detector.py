@@ -22,8 +22,8 @@ class HandDetector():
 
         self.lm_list = []
         self.results = None
-
-        self.model = tf.keras.models.load_model('hand_model.h5')
+        
+        #self.model = tf.keras.models.load_model('hand_model.h5')
         self.input_model_data = []
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -48,8 +48,8 @@ class HandDetector():
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
         #input_data = np.array(self.input_model_data).reshape(1,-1)
         #prediction = self.model.predict(input_data)
-        return self.lm_list#, prediction
-    
+        return self.lm_list, self.input_model_data
+'''
     def detectorMotion(self):
         prediction = []
         #if self.input_model_data :
@@ -63,7 +63,55 @@ class HandDetector():
             return "Pointer"
         else : 
             return None
+'''
+
+def detectorMotion(queue_input, queue_output):
+    model = tf.keras.models.load_model('hand_model.h5')
+    flag = 0
+    dic_prediction = {
+        0: ("Vectory", 1),
+        1: ("OK", 2),
+        2: ("Pointer",3)
+    }
+    while(True):
+        if not queue_input.empty():
+            item = queue_input.get()
+            if item is None:
+                break
+            prediction = model.predict(np.array(item).reshape(1,-1))
+             
+            for index, (output_string, compare_flag) in dic_prediction.items():
+                if prediction[0][index] > 0.9 and flag != compare_flag:
+                    queue_output.put(output_string)
+                    flag = compare_flag
+                    break
+                elif prediction[0][index] > 0.9 :
+                    break
+            else:
+                flag = 0
+            '''
             
+            
+            if prediction[0][0] > 0.9 and not flag == 1:
+                queue_output.put("Vectory")
+                flag = 1
+            elif prediction[0][1] > 0.98 and not flag == 2:
+                queue_output.put("OK")
+                flag = 2
+            elif prediction[0][2] > 0.9 and not flag == 3:
+                queue_output.put("Pointer")
+                flag = 3
+            else:
+                flag = 0            
+            '''            
+
+
+        
+        
+ 
+if __name__ == "__main__":
+    print("OpenCV : ",cv2.__version__)
+    print("tensorflow : ",tf.__version__)    
     #def fingersCheck(self):
     #    fingers = []
     #    fingers.append(1 if self.lm_list[self.finger_id[0]][1] < self.lm_list[self.finger_id[0] - 2][1] \
