@@ -28,7 +28,6 @@ class HandDetector():
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(rgb_img)
- 
         if self.results.multi_hand_landmarks:
             for hand_lms in self.results.multi_hand_landmarks:
                 draw_landmarks(img, hand_lms, mp_hands.HAND_CONNECTIONS)
@@ -37,10 +36,9 @@ class HandDetector():
     def findLandmarks(self, img, hand_index=0):
         self.lm_list = []
         self.input_model_data = []
-        prediction = None
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[hand_index]
- 
+
             for id, lm in enumerate(myHand.landmark):
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
@@ -48,43 +46,43 @@ class HandDetector():
                 self.input_model_data.append([round(lm.x, 3), round(lm.y, 3), round(lm.z, 3)])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
-            #input_data = np.array(self.input_model_data).reshape(1,-1)
-            #prediction = self.model.predict(input_data)
+        #input_data = np.array(self.input_model_data).reshape(1,-1)
+        #prediction = self.model.predict(input_data)
         return self.lm_list#, prediction
     
     def detectorMotion(self):
-        if self.input_model_data :
-            input_data = np.array(self.input_model_data).reshape(1,-1)
-            prediction = self.model.predict(input_data)
-            if prediction[0][0] > 0.9 :
-                return "Vectory"
-                #print(self.motion)
-            elif prediction[0][1] > 0.9 :
-                return "OK"
-                #print(self.motion)
-            elif prediction[0][2] > 0.9 :
-                return "Pointer"
-                #print(self.motion)
+        prediction = []
+        #if self.input_model_data :
+        input_data = np.array(self.input_model_data).reshape(1,-1)
+        prediction = self.model.predict(input_data)
+        if prediction[0][0] > 0.9 :
+            return "Vectory"
+        elif prediction[0][1] > 0.98 :
+            return "OK"
+        elif prediction[0][2] > 0.9 :
+            return "Pointer"
+        else : 
+            return None
             
-    def fingersCheck(self):
-        fingers = []
-        fingers.append(1 if self.lm_list[self.finger_id[0]][1] < self.lm_list[self.finger_id[0] - 2][1] \
-            else 0)
-        fingers = [1 if self.lm_list[self.finger_id[id]][2] < self.lm_list[self.finger_id[id] - 2][2] \
-            else 0 \
-                for id in range(1,5)]
-        
-        return fingers
-     
-    def calculateDistance(self, p1, p2, img):
-        x1, y1 = self.lm_list[p1][1:]
-        x2, y2 = self.lm_list[p2][1:]
-        
-        cv2.line(img, (x1, y1), (x2, y2), (0, 255, 255), 3)
-        cv2.circle(img, (x1, y1), 6, (0, 255, 255), cv2.FILLED)
-        cv2.circle(img, (x2, y2), 6, (0, 255, 255), cv2.FILLED)
- 
-        length = math.hypot(x2 - x1, y2 - y1)
- 
-        return length, img, [x1, y1, x2, y2]
+    #def fingersCheck(self):
+    #    fingers = []
+    #    fingers.append(1 if self.lm_list[self.finger_id[0]][1] < self.lm_list[self.finger_id[0] - 2][1] \
+    #        else 0)
+    #    fingers = [1 if self.lm_list[self.finger_id[id]][2] < self.lm_list[self.finger_id[id] - 2][2] \
+    #        else 0 \
+    #            for id in range(1,5)]
+    #    
+    #    return fingers
+    # 
+    #def calculateDistance(self, p1, p2, img):
+    #    x1, y1 = self.lm_list[p1][1:]
+    #    x2, y2 = self.lm_list[p2][1:]
+    #    
+    #    cv2.line(img, (x1, y1), (x2, y2), (0, 255, 255), 3)
+    #    cv2.circle(img, (x1, y1), 6, (0, 255, 255), cv2.FILLED)
+    #    cv2.circle(img, (x2, y2), 6, (0, 255, 255), cv2.FILLED)
+ #
+    #    length = math.hypot(x2 - x1, y2 - y1)
+ #
+    #    return length, img, [x1, y1, x2, y2]
  
