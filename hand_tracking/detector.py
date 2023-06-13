@@ -24,7 +24,6 @@ class HandDetector():
         self.results = None
         
         #self.model = tf.keras.models.load_model('hand_model.h5')
-        self.input_model_data = []
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.hands.process(rgb_img)
@@ -35,7 +34,7 @@ class HandDetector():
     
     def findLandmarks(self, img, hand_index=0):
         self.lm_list = []
-        self.input_model_data = []
+        input_model_data = []
         if self.results.multi_hand_landmarks:
             myHand = self.results.multi_hand_landmarks[hand_index]
 
@@ -43,12 +42,13 @@ class HandDetector():
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
-                self.input_model_data.append([round(lm.x, 3), round(lm.y, 3), round(lm.z, 3)])
+                #self.input_model_data.append([round(lm.x, 3), round(lm.y, 3), round(lm.z, 3)])
+                input_model_data = np.append(input_model_data, [lm.x,lm.y,lm.z])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
         #input_data = np.array(self.input_model_data).reshape(1,-1)
         #prediction = self.model.predict(input_data)
-        return self.lm_list, self.input_model_data
+        return self.lm_list, input_model_data
 '''
     def detectorMotion(self):
         prediction = []
