@@ -39,7 +39,7 @@ while True:
         print(pointer)
 
 ### qr and surch screen
-    qr.start_qr(img)
+    #qr.start_qr(img)
     qr.screen_qr(img)
     
         
