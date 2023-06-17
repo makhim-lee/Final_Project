@@ -11,14 +11,6 @@ def screen_qr(img):
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 255), 2)  # 검출된 바코드 주위에 사각형.
     
     
-    area = w * h
-    ratio = area / 9
-     
-    x = x - w*2
-    y = y - h*2
-    w = w * ratio
-    h = h * ratio
-    
     cv2.rectangle(img, (x, y), (x + w*3, y+ h*3), (0,255,255),2)
     box = [x,y,w,h]
     return  
@@ -44,17 +36,15 @@ def such_butten(box, pointer):
     
 
 def screen_search(img_queue):
+    cv2.namedWindow("Frame")
     while True:  
-        
         frame = img_queue.get()
         
         cv2.imshow('Frame', frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-    
-
-cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    print(pyzbar.__version__)
+    print("import pyzbar, cv2")

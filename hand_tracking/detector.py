@@ -8,15 +8,15 @@ from mediapipe.python.solutions.drawing_utils import draw_landmarks
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import numpy as np
-
+from multiprocessing import Value
 import time
 class HandDetector():
-    def __init__(self, mode=False, max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence=0.5): 
+    def __init__(self, max_num_hands=1, min_detection_confidence=0.5, min_tracking_confidence=0.5): 
         self.hands = mp_hands.Hands(
-            mode, 
-            max_num_hands, 
-            min_detection_confidence, 
-            min_tracking_confidence)
+            #mode= mode, 
+            max_num_hands=max_num_hands, 
+            min_detection_confidence=min_detection_confidence, 
+            min_tracking_confidence=min_tracking_confidence)
          
         self.finger_id = [4, 8, 12, 16, 20]
 
@@ -61,7 +61,7 @@ class HandDetector():
         return pointer, img
 
 
-    
+   
 def detectorMotion(queue_input, queue_output):
     model = tf.keras.models.load_model('hand_model.h5')
     flag = 0
@@ -70,9 +70,10 @@ def detectorMotion(queue_input, queue_output):
         1: ("OK", 2),
         2: ("Pointer",3)
     }
-    while(True):
+    while True :
         if not queue_input.empty():
             item = queue_input.get()
+            
             prediction = model.predict(np.array(item).reshape(1,-1))
             #prediction = model.predict(item)
             for index, (output_string, compare_flag) in dic_prediction.items():
