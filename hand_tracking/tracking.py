@@ -3,6 +3,7 @@ import numpy as np
 from multiprocessing import Process, Queue
 import detector as detec
 import qr_mod as qr
+import time
 
 from picamera2 import Picamera2
 picam2 = Picamera2()
@@ -13,7 +14,6 @@ picam2.configure("preview")
 picam2.start()
 
 motion = ""
-cap = cv2.VideoCapture(0)
 detector = detec.HandDetector()
 
 queue_input = Queue()
@@ -24,6 +24,8 @@ p1 = Process(target=detec.detectorMotion, args=(queue_input,queue_output))
 p1.start()
 p2 = Process(target=qr.screen_search, args=(img_queue,))
 p2.start()
+
+time.sleep(2.0)
 cv2.namedWindow("Gotcha")
 while True:
     img = picam2.capture_array()
@@ -57,5 +59,4 @@ while True:
         break
 p2.join()
 p1.join()
-cap.release()  
 cv2.destroyAllWindows() 
