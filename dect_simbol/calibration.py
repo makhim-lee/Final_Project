@@ -14,14 +14,14 @@ objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
 # list all calibration images
-images = glob.glob('calib_images/checkerboard/*.jpg')
+images = glob.glob('calib_images/calibration/*.jpg')
 
 for fname in images:
     img = cv2.imread(fname)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     # Find the chess board corners
-    ret, corners = cv2.findChessboardCorners(gray, (7,6), None)
+    ret, corners = cv2.findChessboardCorners(gray, (8,6), None)
 
     # If found, add object points, image points (after refining them)
     if ret == True:
@@ -31,7 +31,7 @@ for fname in images:
         imgpoints.append(corners2)
 
         # Draw and display the corners
-        img = cv2.drawChessboardCorners(img, (7,6), corners2, ret)
+        img = cv2.drawChessboardCorners(img, (8,6), corners2, ret)
         cv2.imshow('img', img)
         cv2.waitKey(500)
 
