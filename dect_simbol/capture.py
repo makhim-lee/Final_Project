@@ -10,7 +10,7 @@ picam2.preview_configuration.main.format = "RGB888"
 picam2.preview_configuration.align()
 picam2.configure("preview")
 picam2.start()
-count = 0
+count = 1
 directory = 'calib_images/calibration/'
 time.sleep(2.0) 
 
@@ -21,14 +21,14 @@ while True:
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    cv2.imshow("Frame", gray)
+    cv2.imshow("Frame", cv2.flip(gray, 1))
     key = cv2.waitKey(1) & 0xFF
 
     if key == ord("p"):
-        filename = directory + 'gray_image_{:02}.jpg'.format(count)
+        filename = directory + 'left{:02}.jpg'.format(count)
         cv2.imwrite(filename, gray)
-        count += 1
         print(count)
+        count += 1
     elif key == ord("q"):
         break
     
