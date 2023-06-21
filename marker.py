@@ -120,6 +120,15 @@ class ScreenMarker(ArucoMarker):
                 text = "good"
         return text
 
+    def XYtoBotten(self, botten_ratio):##use numpy Broadcating 
+        scr_x_len = self.bottom_right[0] - self.top_left[0]
+        scr_y_len = self.bottom_right[1] - self.top_left[1]
+        botten = botten_ratio * np.array([[scr_x_len, scr_y_len, scr_x_len, scr_y_len,]])
+        botten = botten // 100
+        botten = botten + np.array([[self.top_left[0], self.top_left[1], self.top_left[0], self.top_left[1],]])
+        
+        return botten
+
 
 if __name__ == '__main__':
     from picamera2 import Picamera2
