@@ -109,15 +109,13 @@ class ScreenMarker(ArucoMarker):
     def get_border_point(self):
         return self.top_left, self.bottom_right
 
-    def get_angle_marker(self):
+    def get_screen_angle(self):
         text = None
         if self.angle_marker:
             if self.angle_marker < -4:
                 text = "turn right"
             elif self.angle_marker > 4:
                 text = "turn left"
-            else :
-                text = "good"
         return text
 
     def XYtoBotten(self, botten_ratio):##use numpy Broadcating 

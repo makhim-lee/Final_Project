@@ -7,54 +7,22 @@ import numpy as mp
 import threading
 
 
-import socket
-class Socket:
-    def __init__(self, IP="1270.0.0.1", Port="9999"):
-        self.host = socket.gethostname() 
-        self.port = Port 
 
-        self.client_socket = socket.socket()
+class Menu:
+    def __init__(self,):
         
-        ## socket 통신으로 업데이트 할 내용
         self.page_num = None
         self.butten = None
         self.menu = None
         self.store_name = None
         self.finsh_flag = None
         
-    def connect_socket(self):
-        self.client_socket.connect((self.host, self.port))
-    def send_mess(self):
-        ## 가게 ip
-        ## 버튼 클릭 신호 
-        pass
-    def receive_mess(self, mk, stop_event):
-        while not stop_event.is_set():
-            try:
-                pass
-            except:
-                pass
-        ##가게이름 
-        ##키오스크 페이지number
-        ##버튼 좌표()
-            ## xy 고정 좌표가 전체화면중 [x1_ratio,y1_ratio,x2_ratio,y2_ratio] 이런식으로 받고 싶음 
-            ## int 형 (0 ~ 100)
-            ## 2차원 numpy로 넘겨 줄것 
-            #  np.array([[0번 버튼],
-            #            [1번 버튼],
-            #            [2번 버튼],])  
-        ##메뉴명 list[0번 버튼 메뉴명:str, 1번 버튼 메뉴명:str ....]
-        ## 결제완료 
-            ## 버튼 좌표를 계산해주는 코드(page_num)이 바뀔떄 실행되게 하면 될듯 ?    
-            self.butten = mk.XYtoBotten(self.butten)
+  
+        #self.butten = mk.XYtoBotten(self.butten)
         
-    
-    
 
-class SharedDate(Socket) :
-    def __init__(self, IP="1270.0.0.1", Port="9999"):
-        super().__init__(IP=IP, Port=Port)
-        
+class SharedDate(Menu) :
+    def __init__(self,):
         self.motion = None
         self.pointer = None
         self.store_IP = None
@@ -119,11 +87,9 @@ def mark_detec(img_queue, motion_Q, stop_event):
     ## 키오스크 화면 찾아 주는 class
     mk = ScreenMarker(camera_matrix_file='camera_mtx.npy',
                           dist_coeffs_file='camera_dist.npy')
-    ## thread 간 데이터 공유하는 class + run_socket
-    sd = SharedDate(IP="1270.0.0.1", Port="9999")
-    sd.connect_socket()
-    rece_mess = threading.Thread(target=sd.receive_mess, args=(mk, stop_event))
-    rece_mess.start()
+    ## thread 간 데이터 공유하는 class 
+    sd = SharedDate()
+    
     ## tts 언어 지정
     tts = Speaker()
     get_Q = threading.Thread(target=sd.get_queue, args=(motion_Q, stop_event))
@@ -132,13 +98,10 @@ def mark_detec(img_queue, motion_Q, stop_event):
     while True:  
         ## 캠 화면 
         img = img_queue.get()
-        ##receive_scoket
-        sd.receive_mess()
+ 
         ##qr로 부터 가계 Ip 읽기 // qr 인식후엔 키오스크 화면 찾기 
         if sd.store_IP is None:
             sd.store_IP = start_qr(img) ## 가게 ip 
-            ## send store_Ip
-            sd.send_mess(sd.store_IP)
             
             if sd.store_IP is not None :
                 time.sleep(1)
@@ -159,7 +122,6 @@ def mark_detec(img_queue, motion_Q, stop_event):
     cv2.destroyAllWindows()
     time.sleep(1)
     get_Q.join()
-    rece_mess.join()
     print("Process finished")
 
 
