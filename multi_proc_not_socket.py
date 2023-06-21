@@ -39,7 +39,7 @@ class SharedDate(Menu):
     def __init__(self,):
         self.motion = None
         self.pointer = None
-
+        self.finish_flag = False
         self.menu_flag = False
 
 # 손 좌표랑 모션 받아오는 thread
@@ -58,7 +58,7 @@ class SharedDate(Menu):
     def menu_selection(self, mk, tts):
         # 키오스크 화면 찾기
         try:
-            if self.motion != "pointer":
+            if self.pointer is None:
                 raise ValueError("No hand in camera")
             if mk.top_left is None or mk.bottom_right is None:
                 raise ValueError("No detecting screen")
@@ -71,21 +71,24 @@ class SharedDate(Menu):
                 if self.button is not None:
                     for idx, val in enumerate(self.button):
                         if (val[0] < self.pointer[0] < val[3]) and (val[1] < self.pointer[1] < val[4]):
-                            menu_name = self.menu[idx]
-                            tts.speak(f"do you what {menu_name}")
-                            self.menu_flag = True
+                            if not self.menu_flag:
+                                menu_name = self.menu_name[idx]
+                                tts.speak(f"do you what {menu_name}")
+                                self.menu_flag = True
+                            else:
+                                self.finish_flag = True
                             break
                         else:
                             raise ValueError("nothing choose menu")
-                    if self.menu_flag and self.motion == "Victory":
-                        # 메뉴 선택시 서버에 보낼 메세지
-                        self.send_mess(f"{menu_name}")
+                    if self.menu_flag and self.motion == "far":
+                        self.button = self.finish_button
                 else:
                     raise ValueError("No button")
-            if self.finish_flag is not None:
+            if self.finish_flag:
                 tts.speak("finish choose menu")
-                self.finish_flag = None
+                self.finish_flag = False
                 self.store_IP = None
+                self.menu_flag = False
 
         except ValueError as e:
             tts.speak(f"{e}")
@@ -100,11 +103,10 @@ def mark_detec(img_queue, motion_Q, stop_event):
     # 키오스크 화면 찾아 주는 class
     mk = ScreenMarker(camera_matrix_file='camera_mtx.npy',
                       dist_coeffs_file='camera_dist.npy')
-    # thread 간 데이터 공유하는 class
+
     sd = SharedDate()
     sd.make_DB()
 
-    # tts 언어 지정
     tts = Speaker()
     get_Q = threading.Thread(target=sd.get_queue, args=(motion_Q, stop_event))
     get_Q.start()

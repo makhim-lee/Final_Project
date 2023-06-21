@@ -9,7 +9,7 @@ import os
 
 from picamera2 import Picamera2
 picam2 = Picamera2()
-picam2.preview_configuration.main.size = (1280,720)
+picam2.preview_configuration.main.size = (1280, 720)
 picam2.preview_configuration.main.format = "RGB888"
 picam2.preview_configuration.align()
 picam2.configure("preview")
@@ -22,9 +22,9 @@ stop_event = Event()
 
 queue_input = Queue()
 queue_output = Queue()
-p1 = Process(target=detec.detectorMotion, args=(queue_input,queue_output, stop_event))
+p1 = Process(target=detec.detectorMotion, args=(
+    queue_input, queue_output, stop_event))
 p1.start()
-
 
 motion_Q = Queue()
 img_queue = Queue()
@@ -35,31 +35,35 @@ p2.start()
 while not stop_event.is_set():
     img = picam2.capture_array()
 
-### hand detector    
+# hand detector
     detector.findHands(img)
-    input_data = detector.findLandmarks(img) 
-### motion detector
+    input_data = detector.findLandmarks(img)
+# motion detector
     if input_data and queue_input.qsize() <= 1:
         queue_input.put(input_data)
     if not queue_output.empty():
         motion = queue_output.get()
-        
-#### air mouse  
-    if motion == "Pointer" :
+
+# air mouse
+    if motion == "Pointer":
         pointer = detector.pointerMouse(img)
-    else :
+    else:
         pointer = None
-        
-    if pointer is not None :
+    if detector.distanceHand < 10:  # todo find
+        motion = "far"
+    else:
+        motion = "close"
+
+    if pointer is not None:
         motion_Q.put(pointer)
-    elif motion is not None :
+    elif motion is not None:
         motion_Q.put(motion)
 
     if img_queue.qsize() <= 5:
         img_queue.put(img)
-    
-    #cv2.imshow("Gotcha", cv2.flip(img, 1))
-    
+
+    # cv2.imshow("Gotcha", cv2.flip(img, 1))
+
 time.sleep(1)
 p2.join()
 p1.join()
