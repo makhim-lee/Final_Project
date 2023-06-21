@@ -58,9 +58,9 @@ class ArucoMarker:
 class ScreenMarker(ArucoMarker):
     def __init__(self, marker_length=100, dictionary=cv2.aruco.DICT_4X4_50, camera_matrix_file='camera_mtx.npy', dist_coeffs_file='camera_dist.npy'):
         super().__init__(
-            marker_length=marker_length, 
-            dictionary=dictionary, 
-            camera_matrix_file=camera_matrix_file, 
+            marker_length=marker_length,
+            dictionary=dictionary,
+            camera_matrix_file=camera_matrix_file,
             dist_coeffs_file=dist_coeffs_file)
         self.top_left = None
         self.bottom_right = None
@@ -118,14 +118,17 @@ class ScreenMarker(ArucoMarker):
                 text = "turn left"
         return text
 
-    def XYtoBotten(self, botten_ratio):##use numpy Broadcating 
+    def XYtoButton(self, button_ratio):  # use numpy Broadcating
         scr_x_len = self.bottom_right[0] - self.top_left[0]
         scr_y_len = self.bottom_right[1] - self.top_left[1]
-        botten = botten_ratio * np.array([[scr_x_len, scr_y_len, scr_x_len, scr_y_len,]])
-        botten = botten // 100
-        botten = botten + np.array([[self.top_left[0], self.top_left[1], self.top_left[0], self.top_left[1],]])
-        
-        return botten
+        button = button_ratio * \
+            np.array([[scr_x_len, scr_y_len, scr_x_len, scr_y_len,]])
+        button = button // 100
+        button = button + \
+            np.array([[self.top_left[0], self.top_left[1],
+                     self.top_left[0], self.top_left[1],]])
+
+        return button
 
 
 if __name__ == '__main__':
@@ -143,8 +146,8 @@ if __name__ == '__main__':
     while True:
         img = picam2.capture_array()
         marker.marker_screen(img)
-        #distance = marker.distance_to_cam()
-        #_, angle = marker.angles_marker()
+        # distance = marker.distance_to_cam()
+        # _, angle = marker.angles_marker()
         top_left, bottom_right = marker.get_border_point()
         if marker.top_left is not None and marker.bottom_right is not None:
             print(top_left, bottom_right)
