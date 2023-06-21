@@ -58,11 +58,11 @@ class HandDetector():
             y = self.lm_list[8][2]
             pointer = [x, y]
             cv2.circle(img, (x, y), 6, (0, 255, 255), cv2.FILLED)
-        return pointer, img
+        return pointer
 
 
    
-def detectorMotion(queue_input, queue_output):
+def detectorMotion(queue_input, queue_output, stop_event):
     model = tf.keras.models.load_model('hand_model.h5')
     flag = 0
     dic_prediction = {
@@ -70,7 +70,7 @@ def detectorMotion(queue_input, queue_output):
         1: ("OK", 2),
         2: ("Pointer",3)
     }
-    while True :
+    while not stop_event.is_set():
         if not queue_input.empty():
             item = queue_input.get()
             
@@ -86,6 +86,10 @@ def detectorMotion(queue_input, queue_output):
                     break
             else:
                 flag = 0
+    
+    print("Process finished")
+        
+       
         
  
 if __name__ == "__main__":

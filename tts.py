@@ -7,6 +7,8 @@ def speak(text):
     tts.save(filename)  # Save speech audio into a file
     os.system("mpg321 " + filename)  # Play the mp3 file
 
-s = "Please write in English language."  # The string variable
-speak(s)  # Output the string variable to speaker
+
+if __name__ == '__main__':
+    s = "Please write in English language."  # The string variable
+    speak(s)  # Output the string variable to speaker
 

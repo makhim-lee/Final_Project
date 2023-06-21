@@ -1,10 +1,11 @@
 import cv2
 import numpy as np
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Event
 import detector as detec
-import qr_mod as qr
+
 import time
-import marker
+from multi_proc_mod import mark_detec
+import os
 
 from picamera2 import Picamera2
 picam2 = Picamera2()
@@ -17,47 +18,50 @@ time.sleep(2.0)
 
 motion = ""
 detector = detec.HandDetector()
-mark = marker.Marker()
+stop_event = Event()
 
 queue_input = Queue()
 queue_output = Queue()
-p1 = Process(target=detec.detectorMotion, args=(queue_input,queue_output))
+p1 = Process(target=detec.detectorMotion, args=(queue_input,queue_output, stop_event))
 p1.start()
 
-#img_queue = Queue()
-#p2 = Process(target=qr.screen_search, args=(img_queue,))
-#p2.start()
 
-cv2.namedWindow("Gotcha")
-while True:
+motion_Q = Queue()
+img_queue = Queue()
+p2 = Process(target=mark_detec, args=(img_queue, motion_Q, stop_event))
+p2.start()
+
+
+while not stop_event.is_set():
     img = picam2.capture_array()
-    
-    #if img_queue.qsize() <= 5:
-    #    img_queue.put(img)
+
 ### hand detector    
     detector.findHands(img)
     input_data = detector.findLandmarks(img) 
 ### motion detector
-
     if input_data and queue_input.qsize() <= 1:
         queue_input.put(input_data)
     if not queue_output.empty():
         motion = queue_output.get()
-        print(motion)
+        
 #### air mouse  
     if motion == "Pointer" :
-        pointer, img = detector.pointerMouse(img)
-        print(pointer)
-#### qr and surch screen
-    mark.marker_screen(img)
-    print(mark.top_left, mark.bottom_right, mark.distanc_to_mark, mark.screen_rotation_angle)
+        pointer = detector.pointerMouse(img)
+    else :
+        pointer = None
         
-    cv2.imshow("Gotcha", cv2.flip(img, 1))
+    if pointer is not None :
+        motion_Q.put(pointer)
+    elif motion is not None :
+        motion_Q.put(motion)
+
+    if img_queue.qsize() <= 5:
+        img_queue.put(img)
     
-    key = cv2.waitKey(1) 
-    if key == ord('q'): 
-        break
+    #cv2.imshow("Gotcha", cv2.flip(img, 1))
     
-#p2.join()
+time.sleep(1)
+p2.join()
 p1.join()
-cv2.destroyAllWindows() 
+picam2.stop()
+os._exit(0)
