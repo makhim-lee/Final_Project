@@ -82,9 +82,10 @@ def open_ai_yolo(opencv_Q):
     assistant = ObjectDetectionAssistant("yolov4.weights", "yolov4.cfg", "coco.names", "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")
 
     while True:
-        img = opencv_Q.get()
-        object_list, frame = assistant.detect_objects(image_path)
-        obj_list += object_list  # Use `+=` to append elements to the list      
-
+        frame = opencv_Q.get()
+        
+        
+    object_list, frame = assistant.detect_objects(image_path)
+    obj_list += object_list  
     messages = assistant.infer_location(obj_list)
 

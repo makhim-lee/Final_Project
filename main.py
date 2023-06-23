@@ -49,7 +49,7 @@ while not stop_event.is_set():
         p3.start()
         
     if start_openai_flag and opencv_Q.qsize() <= 3:
-        opencv_Q.put
+        opencv_Q.put()
 
 # hand detector
     detector.findHands(img)
