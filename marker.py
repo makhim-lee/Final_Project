@@ -86,7 +86,7 @@ class ScreenMarker(ArucoMarker):
             index = None
             index = np.where(ids == 1)[0]
 
-            if index is not None:
+            if len(index) == 1:
                 self.estimate_pose(corners[index[0]])
 
                 distance = self.distance_to_cam()
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     from picamera2 import Picamera2
     import time
     picam2 = Picamera2()
-    picam2.preview_configuration.main.size = (1280, 720)
+    picam2.preview_configuration.main.size = (720, 1280)
     picam2.preview_configuration.main.format = "RGB888"
     picam2.preview_configuration.align()
     picam2.configure("preview")

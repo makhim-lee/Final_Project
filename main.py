@@ -9,7 +9,7 @@ import os
 
 from picamera2 import Picamera2
 picam2 = Picamera2()
-picam2.preview_configuration.main.size = (1280, 720)
+picam2.preview_configuration.main.size = (720, 1280)
 picam2.preview_configuration.main.format = "RGB888"
 picam2.preview_configuration.align()
 picam2.configure("preview")
@@ -34,9 +34,22 @@ img_queue = Queue()
 p2 = Process(target=mark_detec, args=(img_queue, motion_Q, stop_event))
 p2.start()
 
+from detec_yolo import open_ai_yolo
+
+start_openai_flag = False
+opencv_Q = Queue()
+p3 = Process(target=open_ai_yolo, arg=(opencv_Q))
+
 
 while not stop_event.is_set():
     img = picam2.capture_array()
+    
+    if motion == "good":
+        start_openai_flag = True
+        p3.start()
+        
+    if start_openai_flag and opencv_Q.qsize() <= 3:
+        opencv_Q.put
 
 # hand detector
     detector.findHands(img)

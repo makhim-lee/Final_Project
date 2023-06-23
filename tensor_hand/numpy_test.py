@@ -3,13 +3,31 @@ import pandas as pd
 #def read_csv_file(file_path):
 #    data = np.genfromtxt(file_path, delimiter=',', skip_header=1)
 #    return data
+#ids = np.array([[5]])
+#
+#index = None
+#index = np.where(ids == 1)[0]
+#print(len(index)    )
+import time
 
-def read_csv_file(file_path):
-    data = pd.read_csv(file_path, index_col=0)
-    return data
-# Example usage
-csv_file_path = "test.csv"
-hand_motions = read_csv_file(csv_file_path)
-hand_motions = np.array(hand_motions)
-print(hand_motions)
-print(hand_motions.shape)
+class Debouncer:
+    def __init__(self, delay = 3):
+        self.delay = delay
+        self.last_exec = 0
+
+    def should_execute(self):
+        now = time.time()
+        if now - self.last_exec > self.delay:
+            self.last_exec = now
+            return True
+        return False
+    
+
+De = Debouncer()
+while True:
+    print("A")
+    time.sleep(1)
+    if De.should_execute():
+        print("good")
+    else :
+        print("bad")
