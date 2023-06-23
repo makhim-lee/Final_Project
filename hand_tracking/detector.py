@@ -41,9 +41,9 @@ class HandDetector():
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
                 #input_model_data.append(round(lm.x, 3), round(lm.y, 3), round(lm.z, 3))
-                input_model_data.append(round(lm.x, 3))
-                input_model_data.append(round(lm.y, 3))
-                input_model_data.append(round(lm.z, 3))
+                input_model_data.append(round(lm.x, 5))
+                input_model_data.append(round(lm.y, 5))
+                input_model_data.append(round(lm.z, 5))
                 #input_model_data = np.append(input_model_data, [lm.x,lm.y,lm.z])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
@@ -91,3 +91,48 @@ def detectorMotion(queue_input, queue_output):
 if __name__ == "__main__":
     print("OpenCV : ",cv2.__version__)
     print("tensorflow : ",tf.__version__)    
+    from picamera2 import Picamera2
+    from multiprocessing import Process, Queue, Event
+    import os
+    
+    picam2 = Picamera2()
+    picam2.preview_configuration.main.size = (1280, 720)
+    picam2.preview_configuration.main.format = "RGB888"
+    picam2.preview_configuration.align()
+    picam2.configure("preview")
+    picam2.start()
+    time.sleep(2.0)
+    
+    motion = ""
+    perv_motion = None
+    pointer = None
+    far_flag = True
+    stop_event = Event()
+    detector = HandDetector()
+    
+    queue_input = Queue()
+    queue_output = Queue()
+    p1 = Process(target=detectorMotion, args=(
+        queue_input, queue_output, stop_event))
+    p1.start()
+    while True:
+        img = picam2.capture_array()
+        
+        detector.findHands(img)
+        input_data = detector.findLandmarks(img)
+# motion detector
+        if input_data and queue_input.qsize() <= 1:
+            queue_input.put(input_data)
+        if not queue_output.empty():
+            motion = queue_output.get()
+
+        cv2.putText(img, motion, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
+            
+        cv2.imshow("img", cv2.flip(img, 1))
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            stop_event.set()
+            break
+        
+    p1.join()
+    picam2.stop()
+    os._exit(0)

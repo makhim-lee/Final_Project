@@ -129,6 +129,13 @@ class ScreenMarker(ArucoMarker):
                      self.top_left[0], self.top_left[1],]])
 
         return button
+    
+    def startQr(self,img):
+        ids = None
+        _, ids, _ = self.detect_markers(img)
+        if ids is not None:
+            ids = ids[0][0]
+        return ids
 
 
 if __name__ == '__main__':
@@ -145,15 +152,17 @@ if __name__ == '__main__':
                           dist_coeffs_file='camera_dist.npy')
     while True:
         img = picam2.capture_array()
-        marker.marker_screen(img)
-        # distance = marker.distance_to_cam()
-        # _, angle = marker.angles_marker()
-        top_left, bottom_right = marker.get_border_point()
-        if marker.top_left is not None and marker.bottom_right is not None:
-            print(top_left, bottom_right)
-            text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
-            cv2.putText(img, text, (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        ids = marker.startQr(img)
+        print(ids)
+        #marker.marker_screen(img)
+        ## distance = marker.distance_to_cam()
+        ## _, angle = marker.angles_marker()
+        #top_left, bottom_right = marker.get_border_point()
+        #if marker.top_left is not None and marker.bottom_right is not None:
+        #    print(top_left, bottom_right)
+        #    text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
+        #    cv2.putText(img, text, (50, 50),
+        #                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         cv2.imshow('Image', img)
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):

@@ -1,20 +1,28 @@
 import pandas as pd
 import cv2
 import numpy as np
-from detector import HandDetector
+import detector as detec
 from pprint import pprint
 import time
+from picamera2 import Picamera2
+picam2 = Picamera2()
+picam2.preview_configuration.main.size = (1280, 720)
+picam2.preview_configuration.main.format = "RGB888"
+picam2.preview_configuration.align()
+picam2.configure("preview")
+picam2.start()
 
-cap = cv2.VideoCapture(-1)
-detector = HandDetector()
+detector = detec.HandDetector()
 filename = "test.csv"
 #filename = "landmarks.csv"
 save_datas=[]
 count = 0
 while True:
-    success, img = cap.read()
-    img = detector.findHands(img)
-    lm_list,save_data = detector.findLandmarks(img)
+    img = picam2.capture_array()
+    detector.findHands(img)
+    save_data = detector.findLandmarks(img)
+    
+    save_data = np.array([save_data])
     if cv2.waitKey(1) & 0xFF == ord('p'):#(lm_list is not None):
         if count == 0 :
             save_datas = save_data
@@ -32,7 +40,7 @@ while True:
         pd_data.to_csv(filename, mode='w')
         break
 
-cap.release()
+
 cv2.destroyAllWindows()
 
 dateset = pd.read_csv(filename, index_col=0)

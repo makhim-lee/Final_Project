@@ -8,7 +8,7 @@ from mediapipe.python.solutions.drawing_utils import draw_landmarks
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow as tf
 import numpy as np
-from multiprocessing import Value
+
 import time
 
 
@@ -63,19 +63,22 @@ class HandDetector():
         return pointer
 
     def distanceHand(self):
-        a = self.lm_list[5][1] - self.lm_list[0][1]
-        b = self.lm_list[5][2] - self.lm_list[0][2]
-
-        return math.sqrt(pow(a, 2)+pow(b, 2))
+        distance = 1000
+        if self.results.multi_hand_landmarks:
+            a = self.lm_list[5][1] - self.lm_list[0][1]
+            b = self.lm_list[5][2] - self.lm_list[0][2]
+            distance = math.sqrt(pow(a, 2)+pow(b, 2))
+       
+        return distance
 
 
 def detectorMotion(queue_input, queue_output, stop_event):
     model = tf.keras.models.load_model('hand_model.h5')
     flag = 0
     dic_prediction = {
-        0: ("Victory", 1),
-        1: ("OK", 2),
-        2: ("Pointer", 3)
+        0: ("Pointer", 1),
+        1: ("Victory", 2),
+        2: ("Good", 3)
     }
     while not stop_event.is_set():
         if not queue_input.empty():
@@ -84,19 +87,62 @@ def detectorMotion(queue_input, queue_output, stop_event):
             prediction = model.predict(np.array(item).reshape(1, -1))
             # prediction = model.predict(item)
             for index, (output_string, compare_flag) in dic_prediction.items():
-                if prediction[0][index] > 0.9 and flag != compare_flag:
+                if prediction[0][index] > 0.95 and flag != compare_flag:
                     queue_output.put(output_string)
                     flag = compare_flag
-                    print("input : ", output_string)
                     break
-                elif prediction[0][index] > 0.9:
+                elif prediction[0][index] > 0.95:
                     break
             else:
                 flag = 0
+                queue_output.put("no data")
 
     print("Process finished")
 
 
 if __name__ == "__main__":
-    print("OpenCV : ", cv2.__version__)
-    print("tensorflow : ", tf.__version__)
+    from multiprocessing import Process, Queue, Event
+    from picamera2 import Picamera2
+    
+    picam2 = Picamera2()
+    picam2.preview_configuration.main.size = (1280, 720)
+    picam2.preview_configuration.main.format = "RGB888"
+    picam2.preview_configuration.align()
+    picam2.configure("preview")
+    picam2.start()
+    time.sleep(2.0)
+
+    motion = ""
+    detector = HandDetector()
+    stop_event = Event()
+
+    queue_input = Queue()
+    queue_output = Queue()
+    p1 = Process(target=detectorMotion, args=(
+        queue_input, queue_output, stop_event))
+    p1.start()
+
+
+ 
+    while True:
+        img = picam2.capture_array()
+        
+        detector.findHands(img)
+        input_data = detector.findLandmarks(img)
+# motion detector
+        if input_data and queue_input.qsize() <= 1:
+            queue_input.put(input_data)
+        if not queue_output.empty():
+            motion = queue_output.get()
+
+        cv2.putText(img, motion, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
+            
+        cv2.imshow("img", img)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            stop_event.set()
+            break
+
+    time.sleep(1)
+
+    p1.join()
+    picam2.stop()
