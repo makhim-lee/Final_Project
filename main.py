@@ -1,55 +1,47 @@
 import cv2
 import numpy as np
 from multiprocessing import Process, Queue, Event
-import detector as detec
+
 
 import time
-from multi_proc_not_socket import mark_detec
+
 import os
 
 from picamera2 import Picamera2
 picam2 = Picamera2()
-picam2.preview_configuration.main.size = (720, 1280)
+picam2.preview_configuration.main.size = (1080, 1080)
 picam2.preview_configuration.main.format = "RGB888"
 picam2.preview_configuration.align()
 picam2.configure("preview")
 picam2.start()
-time.sleep(2.0)
+
 
 motion = ""
 perv_motion = None
 pointer = None
 far_flag = True
-detector = detec.HandDetector()
 stop_event = Event()
 
+import detector as detec
+detector = detec.HandDetector()
 queue_input = Queue()
 queue_output = Queue()
-#p1 = Process(target=detec.detectorMotion, args=(
-#    queue_input, queue_output, stop_event))
-#p1.start()
+p1 = Process(target=detec.detectorMotion, args=(queue_input, queue_output, stop_event))
+p1.start()
 
+from multi_proc_not_socket import mark_detec
 motion_Q = Queue()
 img_queue = Queue()
 p2 = Process(target=mark_detec, args=(img_queue, motion_Q, stop_event))
 p2.start()
 
-from detec_yolo import open_ai_yolo
-
-start_openai_flag = False
-opencv_Q = Queue()
-p3 = Process(target=open_ai_yolo, arg=(opencv_Q))
-
+from searching2 import assistant_proc
+yolo_event = Event()
+yolo_Q = Queue()
+p3 = Process(target=assistant_proc, args=(yolo_Q, ))
 
 while not stop_event.is_set():
     img = picam2.capture_array()
-    
-    if motion == "good":
-        start_openai_flag = True
-        p3.start()
-        
-    if start_openai_flag and opencv_Q.qsize() <= 3:
-        opencv_Q.put()
 
 # hand detector
     detector.findHands(img)
@@ -61,26 +53,37 @@ while not stop_event.is_set():
         motion = queue_output.get()
 # air mouse
     distance = detector.distanceHand()
-    if distance < 166 and far_flag:
-        motion_Q.put("far")
-        far_flag = False
-    elif distance > 166:
-        far_flag = True
-    
-    motion = "Pointer"
-    if (motion == "Pointer") :
+    if isinstance(distance, str) and motion_Q.qsize() <= 1:
+        motion_Q.put(distance)
+ 
+    if (motion == "Pointer") or isinstance(motion, list) :
         motion = detector.pointerMouse(img)
         
-    if motion != perv_motion and motion_Q.qsize() <= 3:
+    if motion != perv_motion and motion_Q.qsize() <= 1:
         motion_Q.put(motion)
         perv_motion = motion
         
-    if img_queue.qsize() <= 3:
+    if img_queue.qsize() <= 1:
         img_queue.put(img)
-
+### detec obj with yolo
+    #if motion == "Good":
+    #    p3.start()
+    #    print("start, assistant")
+    #    #yolo_event.set()
+    #    time.sleep(1)
+    #    for _ in range(3):
+    #        time.sleep(3)
+    #        print("plz, wait 3sec")
+    #        img = picam2.capture_array()
+    #        yolo_Q.put(img)
+    #        img_queue.put(img)
+    #    motion = ""
+            
     # cv2.imshow("Gotcha", cv2.flip(img, 1))
 
+
 time.sleep(1)
+p3.join
 p2.join()
 #p1.join()
 picam2.stop()

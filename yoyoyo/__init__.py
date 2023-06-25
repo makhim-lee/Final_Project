@@ -1,0 +1,1 @@
+from yoyoyo.searching2 import assistant_proc

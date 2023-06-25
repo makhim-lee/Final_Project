@@ -9,15 +9,16 @@ import threading
 
 class Debouncer:
     def __init__(self):
-        self.delay = 2
+        self.delay = 3
         self.last_exec = 0
-
+        
     def should_execute(self):
         now = time.time()
         if now - self.last_exec > self.delay:
             self.last_exec = now
             return True
         return False
+      
 
 class Menu:
     def __init__(self,):
@@ -60,15 +61,14 @@ class SharedDate(Menu, Debouncer):
 
 # 손 좌표랑 모션 받아오는 thread
     def get_queue(self, motion_Q):
-        
+      
         if not motion_Q.empty():
             output = motion_Q.get()
             if isinstance(output, str) :
                 self.motion = output
-                print(self.motion)
             elif isinstance(output, list):
                 self.pointer = output
-        
+            print(output)
 
     # 키오스크 이용
     def menu_selection(self, mk, tts,img):
@@ -82,37 +82,36 @@ class SharedDate(Menu, Debouncer):
             if not (within_x_boundaries and within_y_boundaries):
                 raise ValueError("Pointer not within boundary")
             else:
-                if self.button is not None:
-                    for idx, val in enumerate(self.button):
-                        val = mk.XYtoButton(val)
-                        if len(val) > 0:
-                            val = val[0]
-                        cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
-                        if (val[0] < self.pointer[0] < val[2]) and (val[1] < self.pointer[1] < val[3]):
-                            if not self.finish_flag and len(self.menu_name) > idx:                    
-                                self.chose_menu = self.menu_name[idx]
-                #               tts.speak(f"do you what {menu_name}")    
+                if self.button is not None and self.pointer is not None:
+                    button = mk.XYtoButton(self.button)
+                    for idx, val in enumerate(button):
+                        if np.isscalar(val):
+                            continue  # Skip this iteration of the loop
+                        else:
+                            cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
+                            if (val[0] < self.pointer[0] < val[2]) and (val[1] < self.pointer[1] < val[3]):
+                                if not self.finish_flag and len(self.menu_name) > idx:                    
+                                    self.chose_menu = self.menu_name[idx]
+                #                   tts.speak(f"do you what {menu_name}")    
+                                else :
+                                    self.chose_menu = "finish"
+                                    pass
+                                cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
                             else :
-                                self.chose_menu = "finish"
-                                pass
-                            cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
-                        else :
-                            self.chose_menu = None
+                                self.chose_menu = None
                     if self.chose_menu == "finish" and self.motion == "far" and self.should_execute():
                         print("finish")
                         self.finish_flag = False
                         self.store_IP = None
                         self.menu_flag = False
-                        self.chose_menu = None  
+                        self.chose_menu = None 
+                        self.qr_flag = False 
+                        self.motion = None
                     elif self.chose_menu is not None and self.motion == "far" and self.should_execute():   
                         self.button = self.finish_button
                         self.finish_flag = True
                         self.motion = None
-                        self.qr_flag = False
-                        print("ok")
-                        
-                        
-
+                        print("ok")          
                         
         except ValueError as e:
             #tts.speak(f"{e}")
@@ -128,10 +127,8 @@ def mark_detec(img_queue, motion_Q, stop_event):
     # 키오스크 화면 찾아 주는 class
     mk = ScreenMarker(camera_matrix_file='camera_mtx.npy',
                       dist_coeffs_file='camera_dist.npy')
-    qr_flag = False
     sd = SharedDate()
     sd.make_DB()
-    click_int = Debouncer()
 
     tts = Speaker()
     #get_Q = threading.Thread(target=sd.get_queue, args=(motion_Q, stop_event))
@@ -143,36 +140,43 @@ def mark_detec(img_queue, motion_Q, stop_event):
         sd.get_queue(motion_Q)
 
         # qr로 부터 가계 Ip 읽기 // qr 인식후엔 키오스크 화면 찾기
+        print(mk.distance)
         try:
+            if 30 < mk.distance < 60 :
+                raise ValueError("to far screen")
+            #angle = mk.get_screen_angle()
+            #if angle is not None :
+            #    raise ValueError(f"{angle}")
             if sd.store_IP is None:
-
+                print("status")
                 sd.store_IP = mk.startQr(img)  # 가게 ip
 
                 if sd.store_IP is not None:
                     sd.output_DB()
+        #except ValueError as e:
+        #    #tts.speak(f"{e}")
+        #    print(f"{e}")
+        
         except:
             sd.store_IP = None
                     #tts.speak(f"here is {sd.store_name}")
 
     
         if sd.qr_flag:
-            #screen_angle = mk.get_screen_angle()
-            #if screen_angle is not None:
-            #    tts.speak(screen_angle)
+            
             mk.marker_screen(img)
             sd.menu_selection(mk, tts, img)
             
-        elif sd.motion == "far" and sd.store_IP is not None and click_int.should_execute(): 
+        elif sd.motion == "far" and sd.store_IP is not None and sd.should_execute(): 
             sd.qr_flag = True
             sd.motion = None
         
-        cv2.imshow("img", cv2.flip(img, 1))
+        cv2.imshow("img", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             stop_event.set()
             break
 
     cv2.destroyAllWindows()
-    time.sleep(1)
     print("Process finished")
 
 

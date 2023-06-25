@@ -17,7 +17,7 @@ class ObjectDetectionAssistant:
         self.api_key = api_key
 
     def detect_objects(self, image_path):
-        img = cv2.imread(image_path)
+        img = image_path
         height, width, channels = img.shape
 
         blob = cv2.dnn.blobFromImage(img, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
@@ -55,7 +55,7 @@ class ObjectDetectionAssistant:
                 cv2.putText(img, label, (x, y + 30), font, 3, color, 3)
                 obj_list.append(label)
 
-        return obj_list, img
+        return obj_list
 
     def infer_location(self, object_list):
         openai.api_key = self.api_key
@@ -89,7 +89,7 @@ def assistant_proc(img_Q):
         if not img_Q.empty():
             frame = img_Q.get()
 
-            object_list, frame = assistant.detect_objects(frame)
+            object_list = assistant.detect_objects(frame)
             obj_list += object_list  
             
             image_path = os.path.join(image_dir, f"image_{image_count}.jpg")
@@ -108,50 +108,3 @@ def assistant_proc(img_Q):
 
 
 
-if __name__ == '__main__':
-    assistant = ObjectDetectionAssistant("yolov3.weights", "yolov3.cfg", "coco.names", "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")
-
-    from picamera2 import Picamera2
-    picam2 = Picamera2()
-    picam2.preview_configuration.main.size = (720, 1280)
-    picam2.preview_configuration.main.format = "RGB888"
-    picam2.preview_configuration.align()
-    picam2.configure("preview")
-    picam2.start()
-    time.sleep(2.0)
-
-    image_count = 0
-    image_dir = "captured_images"
-    if not os.path.exists(image_dir):
-        os.makedirs(image_dir)
-
-    obj_list = []
-
-    while image_count < 3:
-        # Capture image from the camera
-        frame = picam2.capture_array()
-
-        # Save captured image to disk
-        cv2.imshow("frame", frame)
-        if cv2.waitKey(1) & 0xFF == ord('p'):
-
-            image_path = os.path.join(image_dir, f"image_{image_count}.jpg")
-            cv2.imwrite(image_path, frame)
-            image_count += 1
-            print(image_count)
-           # Perform object detection on the captured image
-    cv2.destroyAllWindows()
-    picam2.stop()
-    image_count = 0
-    while image_count < 3:
-
-        image_path = os.path.join(image_dir, f"image_{image_count}.jpg")
-        image_count += 1
-        frame =  cv2.imread(image_path)    
-        if frame is None:
-            print("Image file could not be opened")
-            break
-        object_list, frame = assistant.detect_objects(image_path)
-        obj_list += object_list  # Use `+=` to append elements to the list
-        print(image_count)
-    messages = assistant.infer_location(obj_list)

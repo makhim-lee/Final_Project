@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import time
 
 
 class ArucoMarker:
@@ -44,7 +45,7 @@ class ArucoMarker:
         if self.tvecs is None:
             return None
         distance = np.linalg.norm(self.tvecs)
-        self.distance = int((distance + 100)/20)
+        self.distance = int((distance + 100)/40)
         return self.distance
 
     def angles_marker(self, ):
@@ -52,7 +53,7 @@ class ArucoMarker:
         euler_angles = self.rotationMatrixToEulerAngles(rotation_matrix)
         euler_angles_degrees = np.degrees(euler_angles)
         self.angle_marker = euler_angles_degrees[1]
-        return rotation_matrix, euler_angles_degrees
+        return euler_angles_degrees
 
 
 class ScreenMarker(ArucoMarker):
@@ -70,6 +71,9 @@ class ScreenMarker(ArucoMarker):
         self.focal_length = 1620
         self.paper_width_cm = 21.0
         self.paper_height_cm = 29.7
+        
+        self.last_exec = None
+        self.angle_list = []
 
     def reset_var(self):
         self.top_left = None
@@ -90,7 +94,7 @@ class ScreenMarker(ArucoMarker):
                 self.estimate_pose(corners[index[0]])
 
                 distance = self.distance_to_cam()
-                _, _ = self.angles_marker()
+                _ = self.angles_marker()
 
                 corners = corners[index[0]].reshape((4, 2))
                 (topLeft, topRight, bottomRight, bottomLeft) = corners
@@ -99,9 +103,9 @@ class ScreenMarker(ArucoMarker):
                 cv2.circle(img, (cX, cY), 4, (0, 0, 255), -1)
 
                 paper_width_px = int(
-                    (self.focal_length * self.paper_width_cm) / distance)
+                    (self.focal_length * self.paper_width_cm) / (2 * distance))
                 paper_height_px = int(
-                    (self.focal_length * self.paper_height_cm) / distance)
+                    (self.focal_length * self.paper_height_cm) / (2 * distance))
 
                 self.draw_paper_border(
                     img, (cX, cY), (paper_width_px, paper_height_px))
@@ -111,23 +115,34 @@ class ScreenMarker(ArucoMarker):
 
     def get_screen_angle(self):
         text = None
-        if self.angle_marker:
-            if self.angle_marker < -4:
-                text = "turn right"
-            elif self.angle_marker > 4:
+        now = time.time()
+        if self.last_exec == None : 
+            self.last_exec = now
+        elif now - self.last_exec < 3 :
+            self.angle_list.append(self.angle_marker)
+        elif now - self.last_exec > 3 and self.angle_list:
+            average = sum(self.angle_list) / len(self.angle_list)
+        
+            if average > 25:
                 text = "turn left"
+            elif average < -8:
+                text = "turn right"
+            self.angle_list = []
+            self.last_exec = None
         return text
 
     def XYtoButton(self, button_ratio):  # use numpy Broadcating
-        scr_x_len = self.bottom_right[0] - self.top_left[0]
-        scr_y_len = self.bottom_right[1] - self.top_left[1]
-        button = button_ratio * \
-            np.array([[scr_x_len, scr_y_len, scr_x_len, scr_y_len,]])
-        button = button // 100
-        button = button + \
-            np.array([[self.top_left[0], self.top_left[1],
-                     self.top_left[0], self.top_left[1],]])
-
+        button = None
+        try:
+            scr_x_len = self.bottom_right[0] - self.top_left[0]
+            scr_y_len = self.bottom_right[1] - self.top_left[1]
+            button = button_ratio * np.array([[scr_x_len, scr_y_len, scr_x_len, scr_y_len,]])
+            button = button // 100
+            button = button + \
+                np.array([[self.top_left[0], self.top_left[1],
+                         self.top_left[0], self.top_left[1],]])
+        except:
+            pass
         return button
     
     def startQr(self,img):
@@ -142,7 +157,7 @@ if __name__ == '__main__':
     from picamera2 import Picamera2
     import time
     picam2 = Picamera2()
-    picam2.preview_configuration.main.size = (720, 1280)
+    picam2.preview_configuration.main.size = (1280, 720)
     picam2.preview_configuration.main.format = "RGB888"
     picam2.preview_configuration.align()
     picam2.configure("preview")
@@ -150,19 +165,33 @@ if __name__ == '__main__':
     time.sleep(2.0)
     marker = ScreenMarker(camera_matrix_file='camera_mtx.npy',
                           dist_coeffs_file='camera_dist.npy')
+    
+    aaa = np.array([[23, 60, 77, 80]])
     while True:
         img = picam2.capture_array()
-        ids = marker.startQr(img)
-        print(ids)
-        #marker.marker_screen(img)
-        ## distance = marker.distance_to_cam()
-        ## _, angle = marker.angles_marker()
-        #top_left, bottom_right = marker.get_border_point()
-        #if marker.top_left is not None and marker.bottom_right is not None:
-        #    print(top_left, bottom_right)
-        #    text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
-        #    cv2.putText(img, text, (50, 50),
-        #                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        marker.marker_screen(img)
+        
+        
+        
+        # distance = marker.distance_to_cam()
+        # _, angle = marker.angles_marker()
+        top_left, bottom_right = marker.get_border_point()
+        if marker.top_left is not None and marker.bottom_right is not None:
+            
+            test = marker.get_screen_angle()
+            print(test)
+        
+            text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
+            cv2.putText(img, text, (50, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            
+            #button = marker.XYtoButton(aaa)
+            #if button is not None:
+            #    for idx, val in enumerate(button):
+            #        if np.isscalar(val):
+            #            continue  # Skip this iteration of the loop
+            #        else:
+            #            cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
         cv2.imshow('Image', img)
         key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):

@@ -24,6 +24,8 @@ class HandDetector():
 
         self.lm_list = []
         self.results = None
+        
+        self.state_start_time = None
 
     def findHands(self, img):
         rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -43,9 +45,9 @@ class HandDetector():
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 self.lm_list.append([id, cx, cy])
                 # input_model_data.append(round(lm.x, 3), round(lm.y, 3), round(lm.z, 3))
-                input_model_data.append(round(lm.x, 3))
-                input_model_data.append(round(lm.y, 3))
-                input_model_data.append(round(lm.z, 3))
+                input_model_data.append(round(lm.x, 5))
+                input_model_data.append(round(lm.y, 5))
+                input_model_data.append(round(lm.z, 5))
                 # input_model_data = np.append(input_model_data, [lm.x,lm.y,lm.z])
                 if id == 0:
                     cv2.circle(img, (cx, cy), 6, (0, 0, 255), cv2.FILLED)
@@ -62,13 +64,23 @@ class HandDetector():
             cv2.circle(img, (x, y), 6, (0, 255, 255), cv2.FILLED)
         return pointer
 
+
     def distanceHand(self):
         distance = 1000
         if self.results.multi_hand_landmarks:
             a = self.lm_list[5][1] - self.lm_list[0][1]
             b = self.lm_list[5][2] - self.lm_list[0][2]
             distance = math.sqrt(pow(a, 2)+pow(b, 2))
-       
+    
+        if distance < 166:
+            if self.state_start_time is None:  # Condition just became True
+                self.state_start_time = time.time()
+            elif time.time() - self.state_start_time > 1.5:  # Condition has been True for required_state_duration
+                self.state_start_time = None
+                return "far"
+        else:  # Condition is False
+            self.state_start_time = None
+
         return distance
 
 
@@ -76,9 +88,10 @@ def detectorMotion(queue_input, queue_output, stop_event):
     model = tf.keras.models.load_model('hand_model.h5')
     flag = 0
     dic_prediction = {
-        0: ("Pointer", 1),
-        1: ("Victory", 2),
-        2: ("Good", 3)
+        0: ("Hand", 1),
+        1: ("Good", 2),
+        2: ("Victory", 3),
+        3: ("Pointer", 4)
     }
     while not stop_event.is_set():
         if not queue_input.empty():
@@ -93,9 +106,6 @@ def detectorMotion(queue_input, queue_output, stop_event):
                     break
                 elif prediction[0][index] > 0.95:
                     break
-            else:
-                flag = 0
-                queue_output.put("no data")
 
     print("Process finished")
 
@@ -122,15 +132,13 @@ if __name__ == "__main__":
         queue_input, queue_output, stop_event))
     p1.start()
 
-
- 
     while True:
         img = picam2.capture_array()
         
         detector.findHands(img)
         input_data = detector.findLandmarks(img)
 # motion detector
-        if input_data and queue_input.qsize() <= 1:
+        if input_data and queue_input.empty():
             queue_input.put(input_data)
         if not queue_output.empty():
             motion = queue_output.get()
