@@ -14,7 +14,7 @@ qrcode = 0
 class Communication:
     def __init__(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(('0.0.0.0', 8485))
+        self.server_socket.bind(('169.254.158.230', 9999))
         self.server_socket.listen()
 
     def handle_client(self, conn):
@@ -52,7 +52,7 @@ class Communication:
                 
             elif data_type == ord('W'):  # Message
                 message = frame_data.decode()
-                qrcode = message
+                qrcode = int(message)
                 print(qrcode)
                 
             elif data_type == ord('E'):  # Message
@@ -73,8 +73,8 @@ class Communication:
 
         conn.close()
         
-    def send_text(self,conn,qrcode):
-        
+    def send_text(self,conn):
+        global qrcode
         button1 = np.array([[23, 20, 77, 40], [23, 60, 77, 80]])
         button2 = np.array([[3, 4, 6, 1]])
         coordinate = {
@@ -83,18 +83,23 @@ class Communication:
         'button_np': [button1, button2]
         }
         serialized_data = pickle.dumps(coordinate)
-
-        if qrcode == 5:           
-            message = struct.pack("B", ord('V')) + struct.pack("Q", len(serialized_data)) + serialized_data
-            conn.sendall(message)
-        else:
-            return
-            
+        while True:
+            print(qrcode)
+            print(type(qrcode))
+            if qrcode == 5:           
+                message = struct.pack("B", ord('V')) + struct.pack("Q", len(serialized_data)) + serialized_data
+                conn.sendall(message)
+                break
+        
     def run(self):
+        global qrcode
         while True:
             conn, addr = self.server_socket.accept()
+            print("Aa")
+            threading.Thread(target=self.send_text, args=(conn,)).start()
             threading.Thread(target=self.handle_client, args=(conn,)).start()
-            self.send_text(conn, qrcode)
+            print("AA")
+
 class Administrator:
     def get_userList(self):
         with userLock:
@@ -150,6 +155,7 @@ class Administrator:
 
 admin = Administrator()
 comm = Communication()
+
 
 t = threading.Thread(target=admin.show_display)
 t1 = threading.Thread(target=comm.run)
