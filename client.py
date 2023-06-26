@@ -3,41 +3,62 @@ import cv2
 import pickle
 import struct
 import threading
-# from marker import ScreenMarker
+
 import time
-# from tts import Speaker
+
+import numpy as np
+import pandas as pd
+import threading
+
+class Menu:
+    def __init__(self,):
+        self.store_IP = None
+        self.button = None
+        self.menu_name = None
+        self.store_name = None
+        self.finish_button = np.array([[23, 60, 77, 80]])
+        self.DB = None
+
+    def make_DB(self,):
+        button1 = np.array([[23, 20, 77, 40], [23, 60, 77, 80]])
+        button2 = np.array([[3, 4, 6, 1]])
+
+        data = {
+            'name': ['restaurant', 'hope',],
+            'button_list': [['Steak', 'Shake', ], ['soju',]],
+            'button_np': [button1, button2]
+        }
+        IP = [1, 2]
+        self.DB = pd.DataFrame(data, index=IP)
+
+    def output_DB(self ):
+        self.store_name, self.menu_name, self.button = self.DB.loc[self.store_IP]
 
 class Communication:
     def __init__(self):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect(('localhost', 8485))
+        self.client_socket.connect(('localhost', 9999))
         self.camera = cv2.VideoCapture(0)
+
         self.userID = 'F'  # 서버 접속시 ID전송
         data = self.userID.encode()
         message = struct.pack("B", ord('A')) + struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
         
-    def send_qrcode(self,qrcode):
-        data = qrcode.encode()
-        message = struct.pack("B", ord('W')) + struct.pack("Q", len(data)) + data
-        self.client_socket.sendall(message)        
-        
-    def send_frame(self,frame):
+    def send_frame(self):
+        while self.camera.isOpened():
+            ret, frame = self.camera.read()
             data = pickle.dumps(frame)
             message = struct.pack("B", ord(self.userID)) + struct.pack("Q", len(data)) + data
             self.client_socket.sendall(message)
-
-    def send_menu(self,menu):
-        data = menu.encode() # 인식한 사물이름 텍스트 전송
-        message = struct.pack("B", ord('E')) + struct.pack("Q", len(data)) + data
+            
+    def send_text(self):
+        text = input()  # 인식한 사물이름 텍스트 전송
+        data = text.encode()
+        message = struct.pack("B", ord('W')) + struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
-    
-    def send_payment(self,payment):
-        data = payment.encode() # 인식한 사물이름 텍스트 전송
-        message = struct.pack("B", ord('R')) + struct.pack("Q", len(data)) + data
-        self.client_socket.sendall(message)        
         
-    def get_data(self, complete_choose, complete_payment, qrcode_menu):
+    def get_data(self):
         data = b""
         payload_size = struct.calcsize("Q")
 
@@ -63,19 +84,29 @@ class Communication:
 
             if data_type == ord('N'):  # Message
                 message = frame_data.decode()
-                complete_choose = message
-            elif data_type == ord('K'):
-                message = frame_data.decode()
-                complete_payment = message
+                print("text " + message)
             elif data_type == ord('V'):  # Message
                 message = pickle.loads(frame_data)
-                qrcode_menu = message
+                print(message)
 
     def __del__(self):
         data = self.userID.encode()  # 접속 종료시 ID전송
         message = struct.pack("B", ord('E')) + struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
 
+client = Communication()
 
-    #client.camera.release()
-    #client.client_socket.close()
+t = threading.Thread(target=client.send_frame)
+t1 = threading.Thread(target=client.send_text)
+t2 = threading.Thread(target=client.get_data)
+
+t.start()
+t1.start()
+t2.start()
+
+t.join()
+t1.join()
+t2.join()
+
+client.camera.release()
+client.client_socket.close()
