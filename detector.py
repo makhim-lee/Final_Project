@@ -43,7 +43,7 @@ class HandDetector():
             for id, lm in enumerate(myHand.landmark):
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
-                self.lm_list.append([id, cx, cy])
+                self.lm_list.append([id, cx, cy, lm.z])
                 # input_model_data.append(round(lm.x, 3), round(lm.y, 3), round(lm.z, 3))
                 input_model_data.append(round(lm.x, 5))
                 input_model_data.append(round(lm.y, 5))
@@ -68,11 +68,12 @@ class HandDetector():
     def distanceHand(self):
         distance = 1000
         if self.results.multi_hand_landmarks:
-            a = self.lm_list[5][1] - self.lm_list[0][1]
-            b = self.lm_list[5][2] - self.lm_list[0][2]
-            distance = math.sqrt(pow(a, 2)+pow(b, 2))
+            x = self.lm_list[5][1] - self.lm_list[0][1]
+            y = self.lm_list[5][2] - self.lm_list[0][2]
+            z = self.lm_list[5][3] - self.lm_list[0][3]
+            distance = math.sqrt(x**2+y**2+z**2)
     
-        if distance < 166:
+        if distance < 180:
             if self.state_start_time is None:  # Condition just became True
                 self.state_start_time = time.time()
             elif time.time() - self.state_start_time > 1.5:  # Condition has been True for required_state_duration
@@ -138,10 +139,14 @@ if __name__ == "__main__":
         detector.findHands(img)
         input_data = detector.findLandmarks(img)
 # motion detector
+        distance = detector.distanceHand()
+        if isinstance(distance, str) :
+            print(distance)
         if input_data and queue_input.empty():
             queue_input.put(input_data)
         if not queue_output.empty():
             motion = queue_output.get()
+        
 
         cv2.putText(img, motion, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
             

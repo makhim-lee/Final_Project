@@ -74,7 +74,7 @@ class ObjectDetectionAssistant:
 
 
 def assistant_proc(img_Q):
-    assistant = ObjectDetectionAssistant("yolov3.weights", "yolov3.cfg", "coco.names", "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")
+    assistant = ObjectDetectionAssistant("yolov3.weights", "yolov3.cfg", "coco.names", "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")
     image_dir = "captured_images"
     if not os.path.exists(image_dir):
         os.makedirs(image_dir)

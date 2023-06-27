@@ -53,7 +53,6 @@ class ArucoMarker:
         euler_angles = self.rotationMatrixToEulerAngles(rotation_matrix)
         euler_angles_degrees = np.degrees(euler_angles)
         self.angle_marker = euler_angles_degrees[1]
-        return euler_angles_degrees
 
 
 class ScreenMarker(ArucoMarker):
@@ -85,18 +84,17 @@ class ScreenMarker(ArucoMarker):
         self.reset_var()
         (corners, ids, rejected) = self.detect_markers(img)
 
-        if len(corners) > 0:
+        if len(corners) > 0 and len(ids) > 0:
             ids = ids.flatten()
-            index = None
-            index = np.where(ids == 1)[0]
+            #index = None
+            #index = np.where(ids == 1)[0]
 
-            if len(index) == 1:
-                self.estimate_pose(corners[index[0]])
+            if ids[0] == 1:
+                self.estimate_pose(corners[0])
 
                 distance = self.distance_to_cam()
-                _ = self.angles_marker()
 
-                corners = corners[index[0]].reshape((4, 2))
+                corners = corners[0].reshape((4, 2))
                 (topLeft, topRight, bottomRight, bottomLeft) = corners
                 cX = int((topLeft[0] + bottomRight[0]) / 2.0)
                 cY = int((topLeft[1] + bottomRight[1]) / 2.0)
@@ -118,17 +116,18 @@ class ScreenMarker(ArucoMarker):
         now = time.time()
         if self.last_exec == None : 
             self.last_exec = now
-        elif now - self.last_exec < 3 :
+        elif now - self.last_exec < 3 and self.angle_marker is not None:
             self.angle_list.append(self.angle_marker)
         elif now - self.last_exec > 3 and self.angle_list:
-            average = sum(self.angle_list) / len(self.angle_list)
-        
-            if average > 25:
-                text = "turn left"
-            elif average < -8:
-                text = "turn right"
-            self.angle_list = []
-            self.last_exec = None
+            if len(self.angle_list) > 0 :
+                average = sum(self.angle_list) / len(self.angle_list)
+
+                if average > 25:
+                    text = "turn right"
+                elif average < -8:
+                    text = "turn left"
+                self.angle_list = []
+                self.last_exec = None
         return text
 
     def XYtoButton(self, button_ratio):  # use numpy Broadcating
@@ -151,7 +150,38 @@ class ScreenMarker(ArucoMarker):
         if ids is not None:
             ids = ids[0][0]
         return ids
+'''
+        ids = None
+        self.reset_var()
+        (corners, ids, rejected) = self.detect_markers(img)
 
+        if len(corners) > 0 and len(ids) > 0:
+            ids = ids.flatten()
+            #index = None
+            #index = np.where(ids == 1)[0]
+
+            if ids[0] == 5:
+                self.estimate_pose(corners[0])
+
+                distance = self.distance_to_cam()
+                self.angles_marker()
+                corners = corners[0].reshape((4, 2))
+                (topLeft, topRight, bottomRight, bottomLeft) = corners
+                
+                topRight = (int(topRight[0]), int(topRight[1]))
+                bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
+                bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
+                topLeft = (int(topLeft[0]), int(topLeft[1]))
+                
+                cv2.line(img, topLeft, topRight, (0, 255, 0), 2)
+                cv2.line(img, topRight, bottomRight, (0, 255, 0), 2)
+                cv2.line(img, bottomRight, bottomLeft, (0, 255, 0), 2)
+                cv2.line(img, bottomLeft, topLeft, (0, 255, 0), 2)
+                ids = ids[0]
+               
+          
+        return ids, distance
+'''
 
 if __name__ == '__main__':
     from picamera2 import Picamera2
@@ -169,21 +199,25 @@ if __name__ == '__main__':
     aaa = np.array([[23, 60, 77, 80]])
     while True:
         img = picam2.capture_array()
-        marker.marker_screen(img)
-        
-        
+        #marker.marker_screen(img)
+        ids = marker.startQr(img)
+        print(ids)
+        angle = marker.get_screen_angle()
+        if angle is not None :
+            print(angle)
+        print(marker.distance_to_cam())
         
         # distance = marker.distance_to_cam()
         # _, angle = marker.angles_marker()
-        top_left, bottom_right = marker.get_border_point()
-        if marker.top_left is not None and marker.bottom_right is not None:
-            
-            test = marker.get_screen_angle()
-            print(test)
-        
-            text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
-            cv2.putText(img, text, (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        #top_left, bottom_right = marker.get_border_point()
+        #if marker.top_left is not None and marker.bottom_right is not None:
+        #    
+        #    test = marker.get_screen_angle()
+        #    print(test)
+        #
+        #    text = f"Distance: {marker.distance}, Angle: {marker.angle_marker}"
+        #    cv2.putText(img, text, (50, 50),
+        #                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             #button = marker.XYtoButton(aaa)
             #if button is not None:

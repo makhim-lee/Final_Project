@@ -1,177 +1,249 @@
 import cv2
 from marker import ScreenMarker
 import time
-from tts import Speaker
-from qr_mod import start_qr
-import numpy as mp
-import threading
+from tts import tts_thread
 
+import numpy as np
+import pandas as pd
+from threading import Thread
+from queue import Queue
+from multiprocessing import Process, Queue
 
 import socket
+import pickle
+import struct
+
+class Debouncer:
+    def __init__(self):
+        self.delay = 2
+        self.last_exec = 0
+        
+    def should_execute(self):
+        now = time.time()
+        if now - self.last_exec > self.delay:
+            self.last_exec = now
+            return True
+        return False
 
 
-class Socket:
-    def __init__(self, IP="1270.0.0.1", Port="9999"):
-        self.host = socket.gethostname()
-        self.port = Port
-
-        self.client_socket = socket.socket()
-
-        # socket 통신으로 업데이트 할 내용
-        self.page_num = None
+class Communication:
+    def __init__(self):
+        ## 서버 설정
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect(('169.254.217.121', 9999))
+        self.userID = 'F'  # 서버 접속시 ID전송
+        data = self.userID.encode()
+        message = struct.pack("B", ord('A')) + struct.pack("Q", len(data)) + data
+        self.client_socket.sendall(message)
+        
+        ##데이터베이스
+        
+        self.store_IP = None
         self.button = None
-        self.menu = None
+        self.menu_name = None
         self.store_name = None
-        self.finish_flag = None
+        self.DB = None
+        self.check_page = None
+        self.IP_set = set([5,6])
+        self.finish_button = np.array([[23, 60, 77, 80]])
 
-    def connect_socket(self):
-        self.client_socket.connect((self.host, self.port))
+## 가게식별
+    def send_qrcode(self,qrcode):
+        
+        data = qrcode.encode()
+        print(type(self.store_IP))
+        message = struct.pack("B", ord('W')) + struct.pack("Q", len(data)) + data
+        self.client_socket.sendall(message)        
+     
+##스트리밍   
+    def send_frame(self,frame):
+            data = pickle.dumps(frame)
+            message = struct.pack("B", ord(self.userID)) + struct.pack("Q", len(data)) + data
+            self.client_socket.sendall(message)
 
-    def send_mess(self):
-        # 가게 ip
-        # 버튼 클릭 신호
-        pass
+    def send_menu(self,menu):
+        data = menu.encode() # 인식한 사물이름 텍스트 전송
+        message = struct.pack("B", ord('H')) + struct.pack("Q", len(data)) + data
+        self.client_socket.sendall(message)
+          
+    def get_data(self):
+        data = b""
+        payload_size = struct.calcsize("Q")
 
-    def receive_mess(self, mk, stop_event):
-        while not stop_event.is_set():
-            try:
-                pass
-            except:
-                pass
-        # 가게이름
-        # 키오스크 페이지number
-        # 버튼 좌표()
-            # xy 고정 좌표가 전체화면중 [x1_ratio,y1_ratio,x2_ratio,y2_ratio] 이런식으로 받고 싶음
-            # int 형 (0 ~ 100)
-            # 2차원 numpy로 넘겨 줄것
-            #  np.array([[0번 버튼],
-            #            [1번 버튼],
-            #            [2번 버튼],])
-        # 메뉴명 list[0번 버튼 메뉴명:str, 1번 버튼 메뉴명:str ....]
-        # 결제완료
-            # 버튼 좌표를 계산해주는 코드(page_num)이 바뀔떄 실행되게 하면 될듯 ?
-            self.button = mk.XYtoButton(self.button)
+        while True:
+            while len(data) < payload_size + 1:
+                packet = self.client_socket.recv(4096)
+                if not packet:
+                    break
+                data += packet
 
+            if not packet:
+                break
 
-class SharedDate(Socket):
-    def __init__(self, IP="1270.0.0.1", Port="9999"):
-        super().__init__(IP=IP, Port=Port)
+            data_type, packed_msg_size = data[0], data[1:payload_size+1]
+            data = data[payload_size+1:]
+            msg_size = struct.unpack("Q", packed_msg_size)[0]
 
+            while len(data) < msg_size:
+                data += self.client_socket.recv(4096)
+
+            frame_data = data[:msg_size]
+            data = data[msg_size:]
+
+            if data_type == ord('V'):  # Message
+                message = pickle.loads(frame_data)
+                print(message)
+                IP = [5, 6]
+                self.DB = pd.DataFrame(message, index=IP)
+                self.store_name, self.menu_name, self.button = self.DB.loc[self.store_IP]
+                print(self.store_name, self.menu_name, self.button)
+                break
+        
+
+        
+class SharedDate(Communication, Debouncer):
+    def __init__(self):
+        Communication.__init__(self)
+        Debouncer.__init__(self)
+        
         self.motion = None
         self.pointer = None
         self.store_IP = None
 
         self.menu_flag = False
-
+        self.qr_flag = None
+        self.finish_flag = False
 # 손 좌표랑 모션 받아오는 thread
-    def get_queue(self, motion_Q, stop_event):
-        while not stop_event.is_set():
-            if not motion_Q.empty():
-                output = motion_Q.get()
-                print(type(output))
+    def get_queue(self, motion_Q):
+      
+        if not motion_Q.empty():
+            output = motion_Q.get()
+            if isinstance(output, str) :
+                self.motion = output
+            elif isinstance(output, list):
+                self.pointer = output
+            print(self.motion)
 
-                if type(output) == "string":
-                    self.motion = output
-                elif type(output) == "list":
-                    self.pointer = output
-
-    # 키오스크 이용
-    def menu_selection(self, mk, tts):
+    def menu_selection(self, mk, tts_Q,img):
         # 키오스크 화면 찾기
         try:
-            if self.motion != "pointer":
-                raise ValueError("No hand in camera")
             if mk.top_left is None or mk.bottom_right is None:
-                raise ValueError("No detecting screen")
-
+                raise ValueError("")
+                #No detecting screen
             within_x_boundaries = mk.top_left[0] < self.pointer[0] < mk.bottom_right[0]
             within_y_boundaries = mk.top_left[1] < self.pointer[1] < mk.bottom_right[1]
+            chosen_menu_exists = False
             if not (within_x_boundaries and within_y_boundaries):
-                raise ValueError("Pointer not within boundary")
+                raise ValueError("not within boundary")
             else:
-                if self.button is not None:
-                    for idx, val in enumerate(self.button):
-                        if (val[0] < self.pointer[0] < val[3]) and (val[1] < self.pointer[1] < val[4]):
-                            menu_name = self.menu[idx]
-                            tts.speak(f"do you what {menu_name}")
-                            self.menu_flag = True
-                            break
+                if self.button is not None and self.pointer is not None:
+                    button = mk.XYtoButton(self.button)
+                    for idx, val in enumerate(button):
+                        if np.isscalar(val):
+                            continue  # Skip this iteration of the loop
                         else:
-                            raise ValueError("nothing choose menu")
-                    if self.menu_flag and self.motion == "Victory":
-                        # 메뉴 선택시 서버에 보낼 메세지
-                        self.send_mess(f"{menu_name}")
-                else:
-                    raise ValueError("No button")
-            if self.finish_flag is not None:
-                tts.speak("finish choose menu")
-                self.finish_flag = None
-                self.store_IP = None
-
+                            cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
+                            if (val[0] < self.pointer[0] < val[2]) and (val[1] < self.pointer[1] < val[3]):
+                                if not self.finish_flag and len(self.menu_name) > idx:                    
+                                    self.chose_menu = self.menu_name[idx]
+                                    chosen_menu_exists = True
+                                    cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
+                                    if tts_Q.empty() :
+                                        tts_Q.put(f"{self.chose_menu}?")    
+                                elif self.finish_flag :
+                                    self.chose_menu = "finish"
+                                    chosen_menu_exists = True 
+                                    if tts_Q.empty() :
+                                        tts_Q.put("calculate?")    
+                               
+                            else :
+                                if chosen_menu_exists :
+                                    chosen_menu_exists = False
+                                else:
+                                    self.chose_menu = None
+                                    if tts_Q.empty(): 
+                                        tts_Q.put("not chose")    
+                  
+                    print(self.motion)
+                    if self.chose_menu is not None and self.motion == "Victory" :   
+                        if self.chose_menu == "finish":
+                            self.send_menu(self.chose_menu)#######
+                            self.finish_flag = False
+                            self.store_IP = None
+                            self.motion = None
+                            self.qr_flag= False
+                            tts_Q.put("Thank you")
+                        else:
+                            self.button = self.finish_button
+                            self.finish_flag = True
+                            self.motion = None
+                            print(self.chose_menu)
+                            self.send_menu(self.chose_menu)#############
+                            tts_Q.put(f"you chose {self.chose_menu}") 
+                            print("ok")     
         except ValueError as e:
-            tts.speak(f"{e}")
+            if tts_Q.empty() :
+                tts_Q.put(f"{e}")
+            print(f"{e}")
 
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             # handle other unexpected errors
-
+          
 
 def mark_detec(img_queue, motion_Q, stop_event):
-    cv2.namedWindow("img")
-    # 키오스크 화면 찾아 주는 class
+  
     mk = ScreenMarker(camera_matrix_file='camera_mtx.npy',
                       dist_coeffs_file='camera_dist.npy')
-    # thread 간 데이터 공유하는 class + run_socket
-    sd = SharedDate(IP="1270.0.0.1", Port="9999")
-    sd.connect_socket()
-    rece_mess = threading.Thread(target=sd.receive_mess, args=(mk, stop_event))
-    rece_mess.start()
-    # tts 언어 지정
-    tts = Speaker()
-    get_Q = threading.Thread(target=sd.get_queue, args=(motion_Q, stop_event))
-    get_Q.start()
+    sd = SharedDate()
 
-    while True:
+    tts_Q = Queue() 
+    get_tts = Process(target=tts_thread, args=(tts_Q, stop_event))
+    get_tts.start()
+    
+    while True:#not stop_event.is_set():
+        #####resive data
+        
         # 캠 화면
         img = img_queue.get()
-        # receive_socket
-        sd.receive_mess()
-        # qr로 부터 가계 Ip 읽기 // qr 인식후엔 키오스크 화면 찾기
-        if sd.store_IP is None:
-            sd.store_IP = start_qr(img)  # 가게 ip
-            # send store_Ip
-            sd.send_mess(sd.store_IP)
+        sd.get_queue(motion_Q)
 
-            if sd.store_IP is not None:
-                time.sleep(1)
-                tts.speak(f"here is {sd.store_name}")
-        else:
-            screen_angle = mk.get_screen_angle()
-            if screen_angle is not None:
-                tts.speak(screen_angle)
+        try: 
+            if sd.store_IP is None:
+                sd.store_IP = mk.startQr(img)  # 가게 ip
+                
+                if sd.store_IP in sd.IP_set:
+                    print(sd.store_IP)
+                    tts_Q.put("well come")
+                else :
+                    sd.store_IP = None
+        except ValueError as e:
+            #tts_Q.put(f"{e}")
+            print(f"{e}")
+        except:
+            sd.store_IP = None
+        if sd.qr_flag:
             mk.marker_screen(img)
-            sd.menu_selection(mk, tts)
+            sd.menu_selection(mk, tts_Q, img)  
+        elif sd.motion == "Victory" and sd.store_IP is not None and sd.should_execute(): 
+            sd.send_qrcode("5") #################################
+            print(sd.store_IP)
+            sd.get_data()
+            time.sleep(2)
+            tts_Q.put(f"here is {sd.store_name}")
+            sd.qr_flag = True
+            sd.motion = None
+            
+            
+            
+        sd.send_frame(img)
 
-        cv2.imshow("img", cv2.flip(img, 1))
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            stop_event.set()
-            break
-
-    cv2.destroyAllWindows()
-    time.sleep(1)
-    get_Q.join()
-    rece_mess.join()
     print("Process finished")
 
-
 if __name__ == '__main__':
+    
+    
+    
+    
+    
     pass
-
-    # if not motion_Q.empty():
-    #    output = motion_Q.get()
-    #    print(type(output))
-    #
-    #    if type(output) == "string":
-    #        motion = output
-    #    elif type(output) == "list":
-    #        pointer = output
