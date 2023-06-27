@@ -79,6 +79,8 @@ class ScreenMarker(ArucoMarker):
         self.bottom_right = None
         self.distance = None
         self.angle_marker = None
+        self.cX = None
+        self.cY = None
 
     def marker_screen(self, img):
         self.reset_var()
@@ -96,9 +98,9 @@ class ScreenMarker(ArucoMarker):
 
                 corners = corners[0].reshape((4, 2))
                 (topLeft, topRight, bottomRight, bottomLeft) = corners
-                cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-                cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-                cv2.circle(img, (cX, cY), 4, (0, 0, 255), -1)
+                self.cX = int((topLeft[0] + bottomRight[0]) / 2.0)
+                self.cY = int((topLeft[1] + bottomRight[1]) / 2.0)
+                cv2.circle(img, (self.cX, self.cY), 4, (0, 0, 255), -1)
 
                 paper_width_px = int(
                     (self.focal_length * self.paper_width_cm) / (2 * distance))
@@ -106,7 +108,8 @@ class ScreenMarker(ArucoMarker):
                     (self.focal_length * self.paper_height_cm) / (2 * distance))
 
                 self.draw_paper_border(
-                    img, (cX, cY), (paper_width_px, paper_height_px))
+                    img, (self.cX, self.cY), (paper_width_px, paper_height_px))
+                
 
     def get_border_point(self):
         return self.top_left, self.bottom_right
@@ -129,6 +132,31 @@ class ScreenMarker(ArucoMarker):
                 self.angle_list = []
                 self.last_exec = None
         return text
+    
+    def find_region(self, point):   
+        if isinstance(self.bottom_right, tuple) and isinstance(self.top_left, tuple):
+            # Assuming square_size is the length of the side of the square
+            region_size_x = (self.bottom_right[0] - self.top_left[0]) / 3
+            region_size_y = (self.bottom_right[1] - self.top_left[1]) / 3
+
+            # Calculate the boundaries of the square
+            left_boundary = self.cX - (self.bottom_right[0] - self.top_left[0])  / 2
+            top_boundary = self.cY - (self.bottom_right[1] - self.top_left[1]) / 2
+
+            # Calculate relative position of the point within the square
+            relative_x = point[0] - left_boundary
+            relative_y = point[1] - top_boundary
+
+            # Calculate region index (0-8)
+            region_x = int(relative_x // region_size_x)
+            region_y = int(relative_y // region_size_y)
+
+            # Convert to 2D grid index (0, 0) to (2, 2)
+            grid_index = (region_y, region_x)
+        else:
+            grid_index = None
+
+        return grid_index
 
     def XYtoButton(self, button_ratio):  # use numpy Broadcating
         button = None
@@ -199,13 +227,15 @@ if __name__ == '__main__':
     aaa = np.array([[23, 60, 77, 80]])
     while True:
         img = picam2.capture_array()
-        #marker.marker_screen(img)
-        ids = marker.startQr(img)
-        print(ids)
-        angle = marker.get_screen_angle()
-        if angle is not None :
-            print(angle)
-        print(marker.distance_to_cam())
+        marker.marker_screen(img)
+        AAA = marker.find_region([500,500])
+        print(AAA)
+        #ids = marker.startQr(img)
+        #print(ids)
+        #angle = marker.get_screen_angle()
+        #if angle is not None :
+        #    print(angle)
+        #print(marker.distance_to_cam())
         
         # distance = marker.distance_to_cam()
         # _, angle = marker.angles_marker()

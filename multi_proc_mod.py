@@ -122,6 +122,7 @@ class SharedDate(Communication, Debouncer):
                 self.motion = output
             elif isinstance(output, list):
                 self.pointer = output
+                self.motion = None  ##################
             print(self.motion)
 
     def menu_selection(self, mk, tts_Q,img):

@@ -73,6 +73,7 @@ class SharedDate(Menu, Debouncer):
                 self.motion = output
             elif isinstance(output, list):
                 self.pointer = output
+                self.motion = None
             
             
     # 키오스크 이용
@@ -82,10 +83,15 @@ class SharedDate(Menu, Debouncer):
             if mk.top_left is None or mk.bottom_right is None:
                 raise ValueError("")
                 #No detecting screen
-            within_x_boundaries = mk.top_left[0] < self.pointer[0] < mk.bottom_right[0]
-            within_y_boundaries = mk.top_left[1] < self.pointer[1] < mk.bottom_right[1]
-            if not (within_x_boundaries and within_y_boundaries):
-                raise ValueError("not within boundary")
+            #within_x_boundaries = mk.top_left[0] < self.pointer[0] < mk.bottom_right[0]
+            #within_y_boundaries = mk.top_left[1] < self.pointer[1] < mk.bottom_right[1]
+            grid_index = mk.find_region(self.pointer)
+            if len(grid_index) > 0:
+                raise ValueError("")
+            
+            if not grid_index == [1,1] :
+                print(grid_index)
+                #raise ValueError("not within boundary")
             else:
                 if self.button is not None and self.pointer is not None:
                     button = mk.XYtoButton(self.button)
@@ -105,9 +111,12 @@ class SharedDate(Menu, Debouncer):
                                         tts_Q.put("calculate?")    
                                 cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
                             else :
-                                self.chose_menu = None
-                                if tts_Q.empty(): 
-                                    tts_Q.put("not chose")    
+                                if chosen_menu_exists :
+                                    chosen_menu_exists = False
+                                else:
+                                    self.chose_menu = None
+                                    if tts_Q.empty(): 
+                                        tts_Q.put("not chose")  
                   
                     print(self.motion)
                     if self.chose_menu is not None and self.motion == "far" and self.should_execute():   
@@ -182,7 +191,7 @@ def mark_detec(img_queue, motion_Q, stop_event):
             tts_Q.put(f"next page")
             time.sleep(2)
         
-        #cv2.imshow("img", img)
+        cv2.imshow("img", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             stop_event.set()
             break

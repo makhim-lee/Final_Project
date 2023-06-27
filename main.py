@@ -29,8 +29,8 @@ queue_output = Queue()
 p1 = Process(target=detec.detectorMotion, args=(queue_input, queue_output, stop_event))
 p1.start()
 
-#from multi_proc_not_socket import mark_detec
-from multi_proc_mod import mark_detec
+from multi_proc_not_socket import mark_detec
+#from multi_proc_mod import mark_detec
 motion_Q = Queue()
 img_queue = Queue()
 p2 = Process(target=mark_detec, args=(img_queue, motion_Q, stop_event))
@@ -56,10 +56,10 @@ while True:
             motion = queue_output.get()
         
     # air mouse
-        #distance = detector.distanceHand()
-        #if isinstance(distance, str) and motion_Q.qsize() <= 1:
-        #    motion_Q.put(distance)
-        #    distance = None
+        distance = detector.distanceHand()
+        if isinstance(distance, str) and motion_Q.qsize() <= 1:
+            motion_Q.put(distance)
+            distance = None
     
         if (motion == "Pointer") or isinstance(motion, list) :
             motion = detector.pointerMouse(img)
