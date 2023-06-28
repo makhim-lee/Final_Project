@@ -11,11 +11,9 @@ import requests
 import threading
 import time
 
-
 # 서버 정보
 SERVER_HOST = '169.254.217.121'
 SERVER_PORT = 9999
-
 # 변수 초기값
 image_path = 'welcome.jpg'
 stop_flag = False
@@ -50,12 +48,12 @@ class Communication:
             frame_data = data[:msg_size]
             data = data[msg_size:]
 
-            if data_type == ord('J'):  # Message
+            if data_type == ord('J'):  # 서버에서 보내준 신호로 상황에 맞게 키오스크 화면 변경 
                 message = int(frame_data.decode())
                 print(message)
 
                 if message == 2:
-                    image_path = 'choose_menu.jpg'    
+                    image_path = 'choose_menu.jpg'
                 elif message == 3:
                     image_path = 'pay_stake.jpg'
                 elif message == 4:
@@ -83,7 +81,6 @@ def show_image():
             fig = plt.figure(figsize=figsize, dpi=dpi)
             
             plt.imshow(img)
-
             plt.axis('off')  # 축 제거
             plt.tight_layout()  # 레이아웃 조정
             plt.subplots_adjust(left=0, right=1, top=1, bottom=0)  # 이미지를 가운데 정렬
@@ -94,24 +91,13 @@ def show_image():
             fig.canvas.draw()
 
         plt.pause(0.1)  # 이미지 표시 갱신 주기 (0.1초)
-        if x == 1:
+        
+        if x == 1: # 원활한 
             x = input()
 
 com = Communication()
-
-t = threading.Thread(target=com.get_data)
-t2 = threading.Thread(target=show_image)
-
-t.start()
-t2.start()
-
-t.join()
-t2.join()
-
-com = Communication()
-
-t = threading.Thread(target=com.get_data)
-t2 = threading.Thread(target=show_image)
+t = threading.Thread(target=com.get_data) # 서버에서 보내는 데이터를 받는 쓰레드
+t2 = threading.Thread(target=show_image) # 키오스크 화면 동작 쓰레드
 
 t.start()
 t2.start()
