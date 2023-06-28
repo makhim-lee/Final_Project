@@ -7,12 +7,13 @@ import numpy as np
 import pandas as pd
 import time
 
-answer = 1
-MODE = 0
-userList = []
-userLock = threading.Lock()
-qrcode = 0
-menu_statement = 0
+answer = 1   # input 쓰레드 입력값
+MODE = 0    # 서버컴퓨터 화면 모드
+userList = []   # 서버에 접속한 유저리스트
+userLock = threading.Lock() # 쓰레드 Lock
+qrcode = 0  # 인식한 qr코드 받아오는 변수
+menu_statement = 0  # 현재 연결된 유저클라이언트가 인식한 메뉴창 상태
+
 class Communication:
     def __init__(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,19 +50,19 @@ class Communication:
             frame_data = data[:msg_size]
             data = data[msg_size:]
 
-            if data_type == ord('A'):  # Message
+            if data_type == ord('A'):  # 유저클라이언트 접속 시 ID 추가
                 message = frame_data.decode()
                 with userLock:
                     userList.append(message)
                     
 
-            elif data_type == ord('W'):  # Message
+            elif data_type == ord('W'):  # 유저클라이언트의 QR코드 인식 정보 확인
                 message = frame_data.decode()
-                qrcode = int(message)##qrcode 인식 완료
+                qrcode = int(message)
                 menu_statement = 1
                 print(qrcode)
                 
-            elif data_type == ord('H'):  # Message
+            elif data_type == ord('H'):  # 메뉴선택 혹은 결제화면 송신
                 message = frame_data.decode()
                 if message == "Stake":
                     menu_statement = 2
@@ -70,23 +71,21 @@ class Communication:
                 elif message == "finish":
                     menu_statement = 4
                     
-                print(message)## 메뉴 선택 완료
+                print(message)
                 
-            elif MODE == 3 and data_type == ord(userList[int(answer)-1]) :  # Video Frame
+            elif MODE == 3 and data_type == ord(userList[int(answer)-1]) :  # 유저클라이언트의 프레임 스트리밍
                 frame = pickle.loads(frame_data)
                 cv2.imshow("Receiving Video", frame)
                 key = cv2.waitKey(1) & 0xFF
                 if answer == '0':
                     cv2.destroyAllWindows()
-                    continue
-                                                  
-
+                    continue                                                  
         conn.close()
         
     def send_text(self,conn):
         global menu_statement
         global qrcode
-        button1 = np.array([[23, 20, 77, 40], [23, 60, 77, 80]])
+        button1 = np.array([[23, 20, 77, 40], [23, 55, 77, 75]]) # 인식한 QRCODE의 좌표
         button2 = np.array([[3, 4, 6, 1]])
         coordinate = {
         'name': ['restaurant', 'hope'],
@@ -97,26 +96,25 @@ class Communication:
         while True:
             time.sleep(0.3)
             if qrcode == 5:           
-                message = struct.pack("B", ord('V')) + struct.pack("Q", len(serialized_data)) + serialized_data
+                message = struct.pack("B", ord('V')) + struct.pack("Q", len(serialized_data)) + serialized_data # Qrcode 읽은 후 좌표데이터 전송
                 conn.sendall(message)
                 data = "2".encode()
-                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data
+                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data # Qrcode를 읽었다는 신호 키오스크클라이언트에 전송
                 conn.sendall(message)         
                 break
         while True:
             time.sleep(0.3)
-            
             if menu_statement == 2:
                 data = "3".encode()
-                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data
+                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data # 스테이크를 선택했다는 신호 키오스크클라이언트에 전송
                 conn.sendall(message)
             elif menu_statement == 3:
                 data = "4".encode()
-                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data
+                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data # 쉐이크를 선택했다는 신호 키오스크클라이언트에 전송
                 conn.sendall(message)  
             elif menu_statement == 4:
                 data = "5".encode()
-                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data
+                message = struct.pack("B", ord('J')) + struct.pack("Q", len(data)) + data # 결제 완료 신호 키오스크클라이언트에 전송
                 conn.sendall(message)  
 
     def run(self):
@@ -147,24 +145,24 @@ class Administrator:
                 self.show_startMenu()
                 while True:
                     answer = input()
-                    if answer == '1':  # 수정: 입력값을 문자열로 비교
+                    if answer == '1':  # 사용자 확인 메뉴
                         MODE = 1
                         break
-                    elif answer == '2':  # 수정: 입력값을 문자열로 비교
+                    elif answer == '2':  # 사용자 영상 출력 메뉴
                         MODE = 2
                         break
             elif MODE == 1:
                 self.get_userList()
                 while True:
                     answer = input()
-                    if answer == '0':  # 수정: 입력값을 문자열로 비교
+                    if answer == '0':  
                         MODE = 0
                         break
             elif MODE == 2:
                 self.get_userList()
                 while True:
                     answer = input()
-                    if answer == '0':  # 수정: 입력값을 문자열로 비교
+                    if answer == '0':  
                         MODE = 0
                         break
                     #elif userList[int(answer)]:
@@ -173,7 +171,7 @@ class Administrator:
                         break
             elif MODE == 3:
                 while True:
-                    print("##### 처음화면 돌아가기 : 0 #####")
+                    print("##### 처음화면 돌아가기 : 0 #####") # 메뉴화면 초기화
                     answer = input()
                     if answer == '0':
                         MODE = 0
