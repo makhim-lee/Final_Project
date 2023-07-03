@@ -6,8 +6,6 @@ from mediapipe.python.solutions import hands as mp_hands
 from mediapipe.python.solutions.drawing_utils import draw_landmarks
 # import os
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import tensorflow as tf
-import numpy as np
 
 import time
 
@@ -24,7 +22,7 @@ class HandDetector():
 
         self.lm_list = []
         self.results = None
-        
+
         self.state_start_time = None
 
     def findHands(self, img):
@@ -64,7 +62,6 @@ class HandDetector():
             cv2.circle(img, (x, y), 6, (0, 255, 255), cv2.FILLED)
         return pointer
 
-
     def distanceHand(self):
         distance = 1000
         if self.results.multi_hand_landmarks:
@@ -72,7 +69,7 @@ class HandDetector():
             y = self.lm_list[5][2] - self.lm_list[0][2]
             z = self.lm_list[5][3] - self.lm_list[0][3]
             distance = math.sqrt(x**2+y**2+z**2)
-    
+
         if distance < 180:
             if self.state_start_time is None:  # Condition just became True
                 self.state_start_time = time.time()
@@ -85,36 +82,10 @@ class HandDetector():
         return distance
 
 
-def detectorMotion(queue_input, queue_output, stop_event):
-    model = tf.keras.models.load_model('hand_model.h5')
-    flag = 0
-    dic_prediction = {
-        0: ("Hand", 1),
-        1: ("Good", 2),
-        2: ("Victory", 3),
-        3: ("Pointer", 4)
-    }
-    while not stop_event.is_set():
-        if not queue_input.empty():
-            item = queue_input.get()
-
-            prediction = model.predict(np.array(item).reshape(1, -1))
-            # prediction = model.predict(item)
-            for index, (output_string, compare_flag) in dic_prediction.items():
-                if prediction[0][index] > 0.95 and flag != compare_flag:
-                    queue_output.put(output_string)
-                    flag = compare_flag
-                    break
-                elif prediction[0][index] > 0.95:
-                    break
-
-    print("Process finished")
-
-
 if __name__ == "__main__":
     from multiprocessing import Process, Queue, Event
     from picamera2 import Picamera2
-    
+
     picam2 = Picamera2()
     picam2.preview_configuration.main.size = (1280, 720)
     picam2.preview_configuration.main.format = "RGB888"
@@ -129,27 +100,27 @@ if __name__ == "__main__":
 
     queue_input = Queue()
     queue_output = Queue()
-    p1 = Process(target=detectorMotion, args=(
+    from process import detectorMotion_proc
+    p1 = Process(target=detectorMotion_proc, args=(
         queue_input, queue_output, stop_event))
     p1.start()
 
     while True:
         img = picam2.capture_array()
-        
+
         detector.findHands(img)
         input_data = detector.findLandmarks(img)
 # motion detector
         distance = detector.distanceHand()
-        if isinstance(distance, str) :
+        if isinstance(distance, str):
             print(distance)
         if input_data and queue_input.empty():
             queue_input.put(input_data)
         if not queue_output.empty():
             motion = queue_output.get()
-        
 
-        cv2.putText(img, motion, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
-            
+        cv2.putText(img, motion, (50, 50), cv2.FONT_ITALIC, 1, (255, 0, 0), 2)
+
         cv2.imshow("img", img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             stop_event.set()

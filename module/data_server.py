@@ -1,23 +1,19 @@
 import cv2
-from marker import ScreenMarker
 import time
-from tts import tts_thread
 
 import numpy as np
 import pandas as pd
-from threading import Thread
-from queue import Queue
-from multiprocessing import Process, Queue
 
 import socket
 import pickle
 import struct
 
+
 class Debouncer:
     def __init__(self):
         self.delay = 2
         self.last_exec = 0
-        
+
     def should_execute(self):
         now = time.time()
         if now - self.last_exec > self.delay:
@@ -28,44 +24,48 @@ class Debouncer:
 
 class Communication:
     def __init__(self):
-        ## 서버 설정
+        # 서버 설정
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect(('169.254.217.121', 9999))
         self.userID = 'F'  # 서버 접속시 ID전송
         data = self.userID.encode()
-        message = struct.pack("B", ord('A')) + struct.pack("Q", len(data)) + data
+        message = struct.pack("B", ord('A')) + \
+            struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
-        
-        ##데이터베이스
-        
+
+        # 데이터베이스
+
         self.store_IP = None
         self.button = None
         self.menu_name = None
         self.store_name = None
         self.DB = None
         self.check_page = None
-        self.IP_set = set([5,6])
+        self.IP_set = set([5, 6])
         self.finish_button = np.array([[23, 60, 77, 80]])
 
-## 가게식별
-    def send_qrcode(self,qrcode):
-        
+# 가게식별
+    def send_qrcode(self, qrcode):
+
         data = qrcode.encode()
         print(type(self.store_IP))
-        message = struct.pack("B", ord('W')) + struct.pack("Q", len(data)) + data
-        self.client_socket.sendall(message)        
-     
-##스트리밍   
-    def send_frame(self,frame):
-            data = pickle.dumps(frame)
-            message = struct.pack("B", ord(self.userID)) + struct.pack("Q", len(data)) + data
-            self.client_socket.sendall(message)
-
-    def send_menu(self,menu):
-        data = menu.encode() # 인식한 사물이름 텍스트 전송
-        message = struct.pack("B", ord('H')) + struct.pack("Q", len(data)) + data
+        message = struct.pack("B", ord('W')) + \
+            struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
-          
+
+# 스트리밍
+    def send_frame(self, frame):
+        data = pickle.dumps(frame)
+        message = struct.pack("B", ord(self.userID)) + \
+            struct.pack("Q", len(data)) + data
+        self.client_socket.sendall(message)
+
+    def send_menu(self, menu):
+        data = menu.encode()  # 인식한 사물이름 텍스트 전송
+        message = struct.pack("B", ord('H')) + \
+            struct.pack("Q", len(data)) + data
+        self.client_socket.sendall(message)
+
     def get_data(self):
         data = b""
         payload_size = struct.calcsize("Q")
@@ -98,14 +98,13 @@ class Communication:
                 self.store_name, self.menu_name, self.button = self.DB.loc[self.store_IP]
                 print(self.store_name, self.menu_name, self.button)
                 break
-        
 
-        
+
 class SharedDate(Communication, Debouncer):
     def __init__(self):
         Communication.__init__(self)
         Debouncer.__init__(self)
-        
+
         self.motion = None
         self.pointer = None
         self.store_IP = None
@@ -114,23 +113,24 @@ class SharedDate(Communication, Debouncer):
         self.qr_flag = None
         self.finish_flag = False
 # 손 좌표랑 모션 받아오는 thread
+
     def get_queue(self, motion_Q):
-      
+
         if not motion_Q.empty():
             output = motion_Q.get()
-            if isinstance(output, str) :
+            if isinstance(output, str):
                 self.motion = output
             elif isinstance(output, list):
                 self.pointer = output
-                self.motion = None  ##################
+                self.motion = None
             print(self.motion)
 
-    def menu_selection(self, mk, tts_Q,img):
+    def menu_selection(self, mk, tts_Q, img):
         # 키오스크 화면 찾기
         try:
             if mk.top_left is None or mk.bottom_right is None:
                 raise ValueError("")
-                #No detecting screen
+                # No detecting screen
             within_x_boundaries = mk.top_left[0] < self.pointer[0] < mk.bottom_right[0]
             within_y_boundaries = mk.top_left[1] < self.pointer[1] < mk.bottom_right[1]
             chosen_menu_exists = False
@@ -143,108 +143,57 @@ class SharedDate(Communication, Debouncer):
                         if np.isscalar(val):
                             continue  # Skip this iteration of the loop
                         else:
-                            cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
+                            cv2.rectangle(
+                                img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
                             if (val[0] < self.pointer[0] < val[2]) and (val[1] < self.pointer[1] < val[3]):
-                                if not self.finish_flag and len(self.menu_name) > idx:                    
+                                if not self.finish_flag and len(self.menu_name) > idx:
                                     self.chose_menu = self.menu_name[idx]
                                     chosen_menu_exists = True
-                                    cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255,0,0), 2)
-                                    if tts_Q.empty() :
-                                        tts_Q.put(f"{self.chose_menu}?")    
-                                elif self.finish_flag :
+                                    cv2.putText(
+                                        img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255, 0, 0), 2)
+                                    if tts_Q.empty():
+                                        tts_Q.put(f"{self.chose_menu}?")
+                                elif self.finish_flag:
                                     self.chose_menu = "finish"
-                                    chosen_menu_exists = True 
-                                    if tts_Q.empty() :
-                                        tts_Q.put("calculate?")    
-                               
-                            else :
-                                if chosen_menu_exists :
+                                    chosen_menu_exists = True
+                                    if tts_Q.empty():
+                                        tts_Q.put("calculate?")
+
+                            else:
+                                if chosen_menu_exists:
                                     chosen_menu_exists = False
                                 else:
                                     self.chose_menu = None
-                                    if tts_Q.empty(): 
-                                        tts_Q.put("not chose")    
-                  
+                                    if tts_Q.empty():
+                                        tts_Q.put("not chose")
+
                     print(self.motion)
-                    if self.chose_menu is not None and self.motion == "Victory" :   
+                    if self.chose_menu is not None and self.motion == "Victory":
                         if self.chose_menu == "finish":
-                            self.send_menu(self.chose_menu)#######
+                            self.send_menu(self.chose_menu)
                             self.finish_flag = False
                             self.store_IP = None
                             self.motion = None
-                            self.qr_flag= False
+                            self.qr_flag = False
                             tts_Q.put("Thank you")
                         else:
                             self.button = self.finish_button
                             self.finish_flag = True
                             self.motion = None
                             print(self.chose_menu)
-                            self.send_menu(self.chose_menu)#############
-                            tts_Q.put(f"you chose {self.chose_menu}") 
-                            print("ok")     
+                            self.send_menu(self.chose_menu)
+                            tts_Q.put(f"you chose {self.chose_menu}")
+                            print("ok")
         except ValueError as e:
-            if tts_Q.empty() :
+            if tts_Q.empty():
                 tts_Q.put(f"{e}")
             print(f"{e}")
 
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             # handle other unexpected errors
-          
 
-def mark_detec(img_queue, motion_Q, stop_event):
-  
-    mk = ScreenMarker(camera_matrix_file='camera_mtx.npy',
-                      dist_coeffs_file='camera_dist.npy')
-    sd = SharedDate()
-
-    tts_Q = Queue() 
-    get_tts = Process(target=tts_thread, args=(tts_Q, stop_event))
-    get_tts.start()
-    
-    while True:#not stop_event.is_set():
-        #####resive data
-        
-        # 캠 화면
-        img = img_queue.get()
-        sd.get_queue(motion_Q)
-
-        try: 
-            if sd.store_IP is None:
-                sd.store_IP = mk.startQr(img)  # 가게 ip
-                
-                if sd.store_IP in sd.IP_set:
-                    print(sd.store_IP)
-                    tts_Q.put("well come")
-                else :
-                    sd.store_IP = None
-        except ValueError as e:
-            #tts_Q.put(f"{e}")
-            print(f"{e}")
-        except:
-            sd.store_IP = None
-        if sd.qr_flag:
-            mk.marker_screen(img)
-            sd.menu_selection(mk, tts_Q, img)  
-        elif sd.motion == "Victory" and sd.store_IP is not None and sd.should_execute(): 
-            sd.send_qrcode("5") #################################
-            print(sd.store_IP)
-            sd.get_data()
-            time.sleep(2)
-            tts_Q.put(f"here is {sd.store_name}")
-            sd.qr_flag = True
-            sd.motion = None
-            
-            
-            
-        sd.send_frame(img)
-
-    print("Process finished")
 
 if __name__ == '__main__':
-    
-    
-    
-    
-    
+
     pass

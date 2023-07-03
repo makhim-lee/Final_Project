@@ -5,6 +5,7 @@ import time
 import os
 from multiprocessing import Event
 
+
 class ObjectDetectionAssistant:
     def __init__(self, weights_file, config_file, names_file, api_key):
         self.net = cv2.dnn.readNet(weights_file, config_file)
@@ -12,7 +13,8 @@ class ObjectDetectionAssistant:
         with open(names_file, "r") as f:
             self.classes = [line.strip() for line in f.readlines()]
         self.layer_names = self.net.getLayerNames()
-        self.output_layers = [self.layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
+        self.output_layers = [self.layer_names[i - 1]
+                              for i in self.net.getUnconnectedOutLayers()]
         self.colors = np.random.uniform(0, 255, size=(len(self.classes), 3))
         self.api_key = api_key
 
@@ -20,7 +22,8 @@ class ObjectDetectionAssistant:
         img = image_path
         height, width, channels = img.shape
 
-        blob = cv2.dnn.blobFromImage(img, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+        blob = cv2.dnn.blobFromImage(
+            img, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
         self.net.setInput(blob)
         outs = self.net.forward(self.output_layers)
 
@@ -60,51 +63,16 @@ class ObjectDetectionAssistant:
     def infer_location(self, object_list):
         openai.api_key = self.api_key
 
-        messages = [{"role": "system", "content": "You are an intelligent assistant."}]
+        messages = [
+            {"role": "system", "content": "You are an intelligent assistant."}]
         user_input = f"Please guess three representative places where these items are located: {object_list}"
         messages.append({"role": "user", "content": user_input})
 
-        chat = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=messages)
+        chat = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo", messages=messages)
         reply = chat.choices[0].message
 
         print("Assistant:", reply["content"])
         messages.append(reply)
 
         return messages
-
-
-def assistant_proc(img_Q):
-    assistant = ObjectDetectionAssistant("yolov3.weights", "yolov3.cfg", "coco.names", "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")
-    image_dir = "captured_images"
-    if not os.path.exists(image_dir):
-        os.makedirs(image_dir)
-    
-    print("realy_assistant")
-    
-    #while not stop_event.is_set():
-    obj_list = []
-    image_count = 0
-    #event.wait()
-    while image_count < 3:
-        if not img_Q.empty():
-            frame = img_Q.get()
-
-            object_list = assistant.detect_objects(frame)
-            obj_list += object_list  
-            
-            image_path = os.path.join(image_dir, f"image_{image_count}.jpg")
-            cv2.imwrite(image_path, frame)
-            
-            image_count += 1
-            print(image_count)
-
-    print(obj_list)  
-    messages = assistant.infer_location(obj_list)
-        #event.close()
-    print("assistant_finished")
-
-
-
-
-
-
