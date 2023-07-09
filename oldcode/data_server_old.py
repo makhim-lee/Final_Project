@@ -7,11 +7,8 @@ import pandas as pd
 import socket
 import pickle
 import struct
-import logging
 
-logging.basicConfig(level=logging.INFO)
 
-## Prevent double click
 class Debouncer:
     def __init__(self):
         self.delay = 2
@@ -24,7 +21,7 @@ class Debouncer:
             return True
         return False
 
-##socket
+
 class Communication:
     def __init__(self):
         # 서버 설정
@@ -35,7 +32,9 @@ class Communication:
         message = struct.pack("B", ord('A')) + \
             struct.pack("Q", len(data)) + data
         self.client_socket.sendall(message)
-        # database
+
+        # 데이터베이스
+
         self.store_IP = None
         self.button = None
         self.menu_name = None
@@ -44,7 +43,6 @@ class Communication:
         self.check_page = None
         self.IP_set = set([5, 6])
         self.finish_button = np.array([[23, 60, 77, 80]])
-        self.finish_menu = ['finish']
 
 # 가게식별
     def send_qrcode(self, qrcode):
@@ -111,8 +109,11 @@ class SharedDate(Communication, Debouncer):
         self.pointer = None
         self.store_IP = None
 
+        self.menu_flag = False
         self.qr_flag = None
-## 손 좌표랑 모션 받아오는 thread
+        self.finish_flag = False
+# 손 좌표랑 모션 받아오는 thread
+
     def get_queue(self, motion_Q):
 
         if not motion_Q.empty():
@@ -123,70 +124,76 @@ class SharedDate(Communication, Debouncer):
                 self.pointer = output
                 self.motion = None
             print(self.motion)
-    
-    def draw_rectangle_and_check_boundaries(self, val):
-        cv2.rectangle(img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
-        return val[0] < self.pointer[0] < val[2] and val[1] < self.pointer[1] < val[3]
-## 가상디스플레이 상호작용
-    def menu_selection(self, marker, tts_Q, img):    
+
+    def menu_selection(self, mk, tts_Q, img):
+        # 키오스크 화면 찾기
         try:
-            if marker.top_left is None or marker.bottom_right is None:
-                raise ValueError("Invalid corner values")
-
-            within_x_boundaries = marker.top_left[0] < self.pointer[0] < marker.bottom_right[0]
-            within_y_boundaries = marker.top_left[1] < self.pointer[1] < marker.bottom_right[1]
+            if mk.top_left is None or mk.bottom_right is None:
+                raise ValueError("")
+                # No detecting screen
+            within_x_boundaries = mk.top_left[0] < self.pointer[0] < mk.bottom_right[0]
+            within_y_boundaries = mk.top_left[1] < self.pointer[1] < mk.bottom_right[1]
+            chosen_menu_exists = False
             if not (within_x_boundaries and within_y_boundaries):
-                raise ValueError("Not within boundary")
+                raise ValueError("not within boundary")
+            else:
+                if self.button is not None and self.pointer is not None:
+                    button = mk.XYtoButton(self.button)
+                    for idx, val in enumerate(button):
+                        if np.isscalar(val):
+                            continue  # Skip this iteration of the loop
+                        else:
+                            cv2.rectangle(
+                                img, (val[0], val[1]), (val[2], val[3]), (0, 255, 0), 2)
+                            if (val[0] < self.pointer[0] < val[2]) and (val[1] < self.pointer[1] < val[3]):
+                                if not self.finish_flag and len(self.menu_name) > idx:
+                                    self.chose_menu = self.menu_name[idx]
+                                    chosen_menu_exists = True
+                                    cv2.putText(
+                                        img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255, 0, 0), 2)
+                                    if tts_Q.empty():
+                                        tts_Q.put(f"{self.chose_menu}?")
+                                elif self.finish_flag:
+                                    self.chose_menu = "finish"
+                                    chosen_menu_exists = True
+                                    if tts_Q.empty():
+                                        tts_Q.put("calculate?")
 
-            if self.pointer is None:
-                raise ValueError("No pointer detected")
+                            else:
+                                if chosen_menu_exists:
+                                    chosen_menu_exists = False
+                                else:
+                                    self.chose_menu = None
+                                    if tts_Q.empty():
+                                        tts_Q.put("not chose")
 
-            if self.button is None:
-                raise ValueError("No data button")
-
-            button = marker.XYtoButton(self.button)
-## 버튼 생성및 손좌표 대조
-            for idx, val in enumerate(button):
-                if np.isscalar(val):
-                    continue
-                within_button_boundaries = self.draw_rectangle_and_check_boundaries(val)
-                if within_button_boundaries:    
-                    if len(self.menu_name) > idx:
-                        self.chose_menu = self.menu_name[idx]
-                        cv2.putText(img, self.chose_menu, (50, 50), cv2.FONT_ITALIC, 1, (255, 0, 0), 2)
-                        if tts_Q.empty():
-                            tts_Q.put(f"{self.chose_menu}?")
-## 선택 이밴트 발생 조건 
-            if self.chose_menu is not None and self.motion == "Victory":
-                self.motion = None
-                self.send_menu(self.chose_menu)
-
-                if self.chose_menu == "finish":
-                    self.store_IP = None
-                    self.qr_flag = False
-                    tts_Q.put("Thank you")
-                else:
-                    self.menu_name = self.finish_menu
-                    self.button = self.finish_button
-                    tts_Q.put(f"You chose {self.chose_menu}")
-
-                self.chose_menu = None
-            elif tts_Q.empty():
-                tts_Q.put("Not chosen")
-
+                    print(self.motion)
+                    if self.chose_menu is not None and self.motion == "Victory":
+                        if self.chose_menu == "finish":
+                            self.send_menu(self.chose_menu)
+                            self.finish_flag = False
+                            self.store_IP = None
+                            self.motion = None
+                            self.qr_flag = False
+                            tts_Q.put("Thank you")
+                        else:
+                            self.button = self.finish_button
+                            self.finish_flag = True
+                            self.motion = None
+                            print(self.chose_menu)
+                            self.send_menu(self.chose_menu)
+                            tts_Q.put(f"you chose {self.chose_menu}")
+                            print("ok")
         except ValueError as e:
             if tts_Q.empty():
                 tts_Q.put(f"{e}")
-            logging.error(f"ValueError: {e}")
+            print(f"{e}")
 
         except Exception as e:
-            logging.error(f"An unexpected error occurred: {e}")
+            print(f"An unexpected error occurred: {e}")
+            # handle other unexpected errors
 
-        
-        
-        
-        
-        
+
 if __name__ == '__main__':
 
     pass
